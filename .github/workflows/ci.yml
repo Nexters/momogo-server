@@ -39,7 +39,7 @@ jobs:
         run: ./gradlew test --no-daemon
 
       - name: Publish test results
-        id: test-results
+        id: test_report
         uses: dorny/test-reporter@v3
         if: ${{ !cancelled() }}
         with:
@@ -49,11 +49,11 @@ jobs:
           fail-on-empty: true
 
       - name: Comment test results on pull request
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
         with:
           header: test-results
-          path: ${{ steps.test-results.outputs.summary_file }}
+          path: ${{ steps.test_report.outputs.summary_file }}
 
       - name: Upload test reports
         uses: actions/upload-artifact@v7
