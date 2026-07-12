@@ -19,14 +19,26 @@ repositories {
     mavenCentral()
 }
 
+configurations.matching { it.name.startsWith('test') }.configureEach {
+    exclude group: 'org.junit.jupiter'
+    exclude group: 'org.assertj'
+    exclude group: 'org.hamcrest'
+    exclude group: 'org.mockito'
+    exclude group: 'org.skyscreamer'
+    exclude group: 'org.xmlunit'
+    exclude group: 'org.awaitility'
+}
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.jetbrains.kotlin:kotlin-reflect'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-    testImplementation 'org.jetbrains.kotlin:kotlin-test-junit5'
+    testImplementation platform('io.kotest:kotest-bom:6.1.5')
+    testImplementation 'io.kotest:kotest-runner-junit5'
+    testImplementation 'io.kotest:kotest-assertions-core'
+    testImplementation 'io.kotest:kotest-extensions-spring'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
