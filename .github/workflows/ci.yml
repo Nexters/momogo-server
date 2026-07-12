@@ -53,7 +53,14 @@ jobs:
         if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
         with:
           header: test-results
-          path: ${{ steps.test_report.outputs.summary_file }}
+          message: |
+            ## 🧪 테스트 결과
+
+            | 성공 | 실패 | 스킵 |
+            | ---: | ---: | ---: |
+            | ${{ steps.test_report.outputs.passed }} | ${{ steps.test_report.outputs.failed }} | ${{ steps.test_report.outputs.skipped }} |
+
+            [상세 테스트 결과 보기](${{ steps.test_report.outputs.url_html }})
 
       - name: Upload test reports
         uses: actions/upload-artifact@v7
