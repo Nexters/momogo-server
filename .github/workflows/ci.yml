@@ -10,6 +10,7 @@ permissions:
   contents: read
   actions: read
   checks: write
+  pull-requests: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -38,6 +39,7 @@ jobs:
         run: ./gradlew test --no-daemon
 
       - name: Publish test results
+        id: test-results
         uses: dorny/test-reporter@v3
         if: ${{ !cancelled() }}
         with:
@@ -45,6 +47,13 @@ jobs:
           path: build/test-results/test/*.xml
           reporter: java-junit
           fail-on-empty: true
+
+      - name: Comment test results on pull request
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        with:
+          header: test-results
+          path: ${{ steps.test-results.outputs.summary_file }}
 
       - name: Upload test reports
         uses: actions/upload-artifact@v7
