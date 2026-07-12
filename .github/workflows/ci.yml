@@ -60,7 +60,7 @@ jobs:
             | ---: | ---: | ---: |
             | ${{ steps.test_report.outputs.passed }} | ${{ steps.test_report.outputs.failed }} | ${{ steps.test_report.outputs.skipped }} |
 
-            [상세 테스트 결과 보기](${{ steps.test_report.outputs.url_html }})
+            [상세 테스트 결과 보기](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
       - name: Upload test reports
         uses: actions/upload-artifact@v7
