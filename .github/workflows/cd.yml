@@ -208,14 +208,16 @@ jobs:
 
           if [[ "$IMAGE_TAGS" == "main" ]]; then
             deployment_target="dev"
+            deployment_emoji="🧪"
             color=3447003
           else
             deployment_target="production"
+            deployment_emoji="🚀"
             color=15158332
           fi
 
           jq -n \
-            --arg title "✅ $deployment_target 이미지 푸시 완료" \
+            --arg title "$deployment_emoji $deployment_target 이미지 푸시 완료" \
             --arg branch "$SOURCE_BRANCH" \
             --arg actor "$GITHUB_ACTOR" \
             --arg revision "$short_sha" \
@@ -229,7 +231,7 @@ jobs:
             --arg timestamp "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             --argjson color "$color" \
             '{
-              username: "Momogo CD",
+              username: "monogo-deploy",
               allowed_mentions: {parse: []},
               embeds: [{
                 title: $title,
