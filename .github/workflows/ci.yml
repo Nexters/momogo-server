@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - 'release/**'
 
 permissions:
   contents: read
@@ -72,3 +73,18 @@ jobs:
             build/test-results/test
           if-no-files-found: warn
           retention-days: 7
+
+  publish-image:
+    name: Publish image
+    needs: test
+    if: ${{ github.event_name == 'push' }}
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/cd.yml
+    with:
+      target: ${{ github.ref_name == 'main' && 'main' || 'production' }}
+      revision: ${{ github.sha }}
+      ref_name: ${{ github.ref_name }}
+    secrets:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}

@@ -3,6 +3,7 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.spring' version '2.3.21'
     id 'org.springframework.boot' version '4.1.0'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.google.cloud.tools.jib' version '3.5.3'
 }
 
 group = 'com.mogumogu'
@@ -50,4 +51,43 @@ kotlin {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+def imageRepository = System.getenv('IMAGE_REPOSITORY') ?: 'ghcr.io/nexters/momogo-server'
+def imageRevision = System.getenv('IMAGE_REVISION') ?: 'local'
+def additionalImageTags = (System.getenv('IMAGE_TAGS') ?: '')
+    .split(',')
+    .collect { it.trim() }
+    .findAll { !it.isEmpty() }
+    .toSet()
+def imageArchitectures = (System.getenv('IMAGE_ARCHITECTURES') ?: 'amd64')
+    .split(',')
+    .collect { it.trim() }
+    .findAll { !it.isEmpty() }
+    .toSet()
+
+jib {
+    from {
+        image = 'eclipse-temurin:21-jre@sha256:d2b9f8f12212cadcfdf889461531784e8fd097feade954d65b31ee7a71c473ec'
+        platforms {
+            imageArchitectures.each { imageArchitecture ->
+                platform {
+                    architecture = imageArchitecture
+                    os = 'linux'
+                }
+            }
+        }
+    }
+    to {
+        image = "${imageRepository}:${imageRevision}"
+        tags = additionalImageTags
+    }
+    container {
+        user = '1000:1000'
+        ports = ['8080']
+        labels = [
+            'org.opencontainers.image.source': 'https://github.com/Nexters/momogo-server',
+            'org.opencontainers.image.revision': imageRevision,
+        ]
+    }
 }
