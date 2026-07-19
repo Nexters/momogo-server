@@ -50,3 +50,6 @@ out/
 .env.*
 !.env.example
 application-secret.yml
+
+### oh-my-claudecode ###
+.omc/
