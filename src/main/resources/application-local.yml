@@ -3,17 +3,13 @@ spring:
     activate:
       on-profile: local
   datasource:
-    url: jdbc:h2:mem:momogo;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:momogo}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME:momogo}
+    password: ${DB_PASSWORD:momogo}
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
