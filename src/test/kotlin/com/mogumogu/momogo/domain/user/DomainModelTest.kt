@@ -57,33 +57,47 @@ class DomainModelTest : BehaviorSpec({
     }
 
     given("LoginAccount를 생성할 때") {
-        `when`("로그인 제공자 식별자가 255자를 초과하면") {
-            then("길이 제한 없이 생성할 수 있다") {
+        `when`("로그인 제공자 식별자가 255자이면") {
+            then("생성할 수 있다") {
                 val loginAccount = LoginAccount(
                     userId = 1L,
                     provider = LoginProvider.GUEST,
-                    providerId = "a".repeat(256),
+                    providerId = "a".repeat(255),
                 )
 
-                loginAccount.providerId.length shouldBe 256
+                loginAccount.providerId.length shouldBe 255
+            }
+        }
+
+        `when`("로그인 제공자 식별자가 255자를 초과하면") {
+            then("생성할 수 없다") {
+                shouldThrow<IllegalArgumentException> {
+                    LoginAccount(
+                        userId = 1L,
+                        provider = LoginProvider.GUEST,
+                        providerId = "a".repeat(256),
+                    )
+                }
             }
         }
 
         `when`("로그인 제공자를 255자 초과 식별자로 변경하면") {
-            then("길이 제한 없이 변경할 수 있다") {
+            then("변경할 수 없다") {
                 val loginAccount = LoginAccount(
                     userId = 1L,
                     provider = LoginProvider.GUEST,
                     providerId = "guest-device-id",
                 )
 
-                loginAccount.changeProvider(
-                    provider = LoginProvider.NAVER,
-                    providerId = "a".repeat(256),
-                )
+                shouldThrow<IllegalArgumentException> {
+                    loginAccount.changeProvider(
+                        provider = LoginProvider.NAVER,
+                        providerId = "a".repeat(256),
+                    )
+                }
 
-                loginAccount.provider shouldBe LoginProvider.NAVER
-                loginAccount.providerId.length shouldBe 256
+                loginAccount.provider shouldBe LoginProvider.GUEST
+                loginAccount.providerId shouldBe "guest-device-id"
             }
         }
 
