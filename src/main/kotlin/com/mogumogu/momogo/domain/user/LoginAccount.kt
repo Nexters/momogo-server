@@ -3,25 +3,11 @@ package com.mogumogu.momogo.domain.user
 class LoginAccount(
     val id: Long? = null,
     val userId: Long,
-    var provider: LoginProvider,
-    providerId: String,
+    val provider: LoginProvider,
+    val providerId: String,
 ) {
-    var providerId: String = providerId
-        set(value) {
-            validateProviderId(value)
-            field = value
-        }
-
     init {
         validateProviderId(providerId)
-    }
-
-    fun changeProvider(
-        provider: LoginProvider,
-        providerId: String,
-    ) {
-        this.providerId = providerId
-        this.provider = provider
     }
 
     private fun validateProviderId(providerId: String) {

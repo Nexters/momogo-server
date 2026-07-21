@@ -54,12 +54,8 @@ class LoginAccountRepositoryTest(
                     val foundLoginAccount = foundLoginAccountEntity.toDomain()
                     foundLoginAccount.provider shouldBe LoginProvider.GUEST
 
-                    foundLoginAccount.changeProvider(
-                        provider = LoginProvider.APPLE,
-                        providerId = "apple-user-id",
-                    )
-                    foundLoginAccountEntity.provider = foundLoginAccount.provider
-                    foundLoginAccountEntity.providerId = foundLoginAccount.providerId
+                    foundLoginAccountEntity.provider = LoginProvider.APPLE
+                    foundLoginAccountEntity.providerId = "apple-user-id"
                     loginAccountRepository.save(foundLoginAccountEntity)
 
                     val updatedLoginAccount = loginAccountRepository
