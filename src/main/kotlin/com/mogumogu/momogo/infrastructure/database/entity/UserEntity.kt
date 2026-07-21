@@ -30,6 +30,8 @@ class UserEntity(
 
     companion object {
         fun fromDomain(user: User): UserEntity =
-            UserEntity(nickname = user.nickname)
+            UserEntity(nickname = user.nickname).apply {
+                id = user.id
+            }
     }
 }

@@ -7,16 +7,20 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
+import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 
 @Entity
 @Table(name = "login_account")
 class LoginAccountEntity(
-    @field:Column(name = "user_id", nullable = false)
-    var userId: Long,
+    @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @field:JoinColumn(name = "user_id", nullable = false)
+    var user: UserEntity,
     @field:Enumerated(EnumType.STRING)
     @field:Column(name = "provider", nullable = false, length = 20)
     var provider: LoginProvider,
@@ -33,17 +37,24 @@ class LoginAccountEntity(
     fun toDomain(): LoginAccount =
         LoginAccount(
             id = id,
-            userId = userId,
+            userId = checkNotNull(user.id) {
+                "로그인 계정에 연결된 사용자 ID가 없습니다."
+            },
             provider = provider,
             providerId = providerId,
         )
 
     companion object {
-        fun fromDomain(loginAccount: LoginAccount): LoginAccountEntity =
+        fun fromDomain(
+            loginAccount: LoginAccount,
+            user: UserEntity,
+        ): LoginAccountEntity =
             LoginAccountEntity(
-                userId = loginAccount.userId,
+                user = user,
                 provider = loginAccount.provider,
                 providerId = loginAccount.providerId,
-            )
+            ).apply {
+                id = loginAccount.id
+            }
     }
 }

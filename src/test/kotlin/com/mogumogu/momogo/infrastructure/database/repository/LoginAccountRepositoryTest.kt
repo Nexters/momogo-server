@@ -5,6 +5,7 @@ import com.mogumogu.momogo.domain.user.LoginProvider
 import com.mogumogu.momogo.domain.user.User
 import com.mogumogu.momogo.infrastructure.database.entity.LoginAccountEntity
 import com.mogumogu.momogo.infrastructure.database.entity.UserEntity
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.extensions.spring.SpringExtension
@@ -13,6 +14,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.test.context.ActiveProfiles
 
 @SpringBootTest
@@ -30,9 +32,9 @@ class LoginAccountRepositoryTest(
                 var loginAccountId: Long? = null
 
                 try {
-                    val savedUser = userRepository
+                    val savedUserEntity = userRepository
                         .save(UserEntity.fromDomain(User(nickname = "모모")))
-                        .toDomain()
+                    val savedUser = savedUserEntity.toDomain()
                     userId = savedUser.id.shouldNotBeNull()
 
                     val savedLoginAccount = loginAccountRepository
@@ -43,6 +45,7 @@ class LoginAccountRepositoryTest(
                                     provider = LoginProvider.GUEST,
                                     providerId = "guest-device-id",
                                 ),
+                                user = savedUserEntity,
                             ),
                         )
                         .toDomain()
@@ -54,9 +57,14 @@ class LoginAccountRepositoryTest(
                     val foundLoginAccount = foundLoginAccountEntity.toDomain()
                     foundLoginAccount.provider shouldBe LoginProvider.GUEST
 
-                    foundLoginAccountEntity.provider = LoginProvider.APPLE
-                    foundLoginAccountEntity.providerId = "apple-user-id"
-                    loginAccountRepository.save(foundLoginAccountEntity)
+                    val updatedLoginAccountEntity = LoginAccountEntity.fromDomain(
+                        loginAccount = foundLoginAccount,
+                        user = savedUserEntity,
+                    )
+                    updatedLoginAccountEntity.id shouldBe loginAccountId
+                    updatedLoginAccountEntity.provider = LoginProvider.APPLE
+                    updatedLoginAccountEntity.providerId = "apple-user-id"
+                    loginAccountRepository.save(updatedLoginAccountEntity)
 
                     val updatedLoginAccount = loginAccountRepository
                         .findById(loginAccountId)
@@ -75,6 +83,38 @@ class LoginAccountRepositoryTest(
 
                     userRepository.deleteById(userId)
                     userId = null
+                } finally {
+                    loginAccountId?.let(loginAccountRepository::deleteById)
+                    userId?.let(userRepository::deleteById)
+                }
+            }
+        }
+
+        `when`("로그인 계정이 연결된 User를 삭제하면") {
+            then("외래 키 제약 조건으로 삭제할 수 없다") {
+                var userId: Long? = null
+                var loginAccountId: Long? = null
+
+                try {
+                    val savedUserEntity = userRepository
+                        .save(UserEntity.fromDomain(User(nickname = "모모")))
+                    userId = savedUserEntity.id.shouldNotBeNull()
+
+                    val savedLoginAccountEntity = loginAccountRepository.save(
+                        LoginAccountEntity.fromDomain(
+                            loginAccount = LoginAccount(
+                                userId = userId,
+                                provider = LoginProvider.GUEST,
+                                providerId = "guest-device-id",
+                            ),
+                            user = savedUserEntity,
+                        ),
+                    )
+                    loginAccountId = savedLoginAccountEntity.id.shouldNotBeNull()
+
+                    shouldThrow<DataIntegrityViolationException> {
+                        userRepository.deleteById(userId)
+                    }
                 } finally {
                     loginAccountId?.let(loginAccountRepository::deleteById)
                     userId?.let(userRepository::deleteById)

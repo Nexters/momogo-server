@@ -35,8 +35,9 @@ class UserRepositoryTest(
                     foundUser.nickname shouldBe "모모"
 
                     foundUser.changeNickname("고모")
-                    foundUserEntity.nickname = foundUser.nickname
-                    userRepository.save(foundUserEntity)
+                    val updatedUserEntity = UserEntity.fromDomain(foundUser)
+                    updatedUserEntity.id shouldBe userId
+                    userRepository.save(updatedUserEntity)
 
                     userRepository.findById(userId).orElseThrow().nickname shouldBe "고모"
                     userRepository.findAll().map { it.toDomain().id } shouldContainExactly listOf(userId)
