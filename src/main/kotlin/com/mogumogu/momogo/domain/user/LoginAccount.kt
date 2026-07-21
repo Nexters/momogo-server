@@ -4,8 +4,14 @@ class LoginAccount(
     val id: Long? = null,
     val userId: Long,
     var provider: LoginProvider,
-    var providerId: String,
+    providerId: String,
 ) {
+    var providerId: String = providerId
+        set(value) {
+            validateProviderId(value)
+            field = value
+        }
+
     init {
         validateProviderId(providerId)
     }
@@ -14,9 +20,8 @@ class LoginAccount(
         provider: LoginProvider,
         providerId: String,
     ) {
-        validateProviderId(providerId)
-        this.provider = provider
         this.providerId = providerId
+        this.provider = provider
     }
 
     private fun validateProviderId(providerId: String) {

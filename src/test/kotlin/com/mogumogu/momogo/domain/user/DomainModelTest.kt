@@ -101,6 +101,22 @@ class DomainModelTest : BehaviorSpec({
             }
         }
 
+        `when`("로그인 제공자 식별자에 255자 초과 값을 직접 대입하면") {
+            then("변경할 수 없다") {
+                val loginAccount = LoginAccount(
+                    userId = 1L,
+                    provider = LoginProvider.GUEST,
+                    providerId = "guest-device-id",
+                )
+
+                shouldThrow<IllegalArgumentException> {
+                    loginAccount.providerId = "a".repeat(256)
+                }
+
+                loginAccount.providerId shouldBe "guest-device-id"
+            }
+        }
+
         `when`("로그인 제공자를 올바른 값으로 변경하면") {
             then("제공자와 식별자를 함께 변경한다") {
                 val loginAccount = LoginAccount(
