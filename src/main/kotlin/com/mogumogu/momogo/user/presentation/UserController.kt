@@ -2,6 +2,7 @@ package com.mogumogu.momogo.user.presentation
 
 import com.mogumogu.momogo.global.security.RequestUserId
 import com.mogumogu.momogo.user.application.AuthService
+import com.mogumogu.momogo.user.application.UpdateNicknameCommand
 import com.mogumogu.momogo.user.application.UserService
 import com.mogumogu.momogo.user.domain.LoginProvider
 import jakarta.validation.Valid
@@ -44,14 +45,16 @@ class UserController(
         @RequestBody
         request: UpdateNicknameRequest,
     ): UserResponse {
-        val updatedUser = userService.updateNickname(
-            userId = userId,
-            nickname = request.nickname,
+        val result = userService.updateNickname(
+            UpdateNicknameCommand(
+                userId = userId,
+                nickname = request.nickname,
+            ),
         )
 
         return UserResponse(
-            userId = updatedUser.userId,
-            nickname = updatedUser.nickname,
+            userId = result.userId,
+            nickname = result.nickname,
         )
     }
 

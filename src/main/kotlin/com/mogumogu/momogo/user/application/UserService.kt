@@ -17,19 +17,16 @@ class UserService(
 ) {
 
     @Transactional
-    fun updateNickname(
-        userId: Long,
-        nickname: String,
-    ): UpdatedUser {
-        val user = findUser(userId)
+    fun updateNickname(command: UpdateNicknameCommand): UpdateNicknameResult {
+        val user = findUser(command.userId)
 
         try {
-            user.updateNickname(nickname)
+            user.updateNickname(command.nickname)
         } catch (_: IllegalArgumentException) {
             throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
         }
 
-        return UpdatedUser(
+        return UpdateNicknameResult(
             userId = checkNotNull(user.id) { "저장된 사용자 ID가 없습니다." },
             nickname = user.nickname,
         )
@@ -52,7 +49,12 @@ class UserService(
             .orElseThrow { ApiException.NotFound(ErrorCode.USER_NOT_FOUND) }
 }
 
-data class UpdatedUser(
+data class UpdateNicknameCommand(
+    val userId: Long,
+    val nickname: String,
+)
+
+data class UpdateNicknameResult(
     val userId: Long,
     val nickname: String,
 )
