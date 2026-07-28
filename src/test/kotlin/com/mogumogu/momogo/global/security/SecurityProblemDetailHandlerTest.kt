@@ -18,7 +18,7 @@ class SecurityProblemDetailHandlerTest : BehaviorSpec({
 
     given("인증에 실패하면") {
         val entryPoint = ProblemDetailAuthenticationEntryPoint(writer)
-        val request = MockHttpServletRequest("PATCH", "/user")
+        val request = MockHttpServletRequest("PATCH", "/api/v1/user")
         val response = MockHttpServletResponse()
 
         `when`("내부 JWT 오류에 민감한 원문이 들어 있어도") {
@@ -36,7 +36,7 @@ class SecurityProblemDetailHandlerTest : BehaviorSpec({
                 body["status"].intValue() shouldBe 401
                 body["title"].stringValue() shouldBe "Unauthorized"
                 body["detail"].stringValue() shouldBe ErrorCode.INVALID_AUTH_CREDENTIALS.message
-                body["instance"].stringValue() shouldBe "/user"
+                body["instance"].stringValue() shouldBe "/api/v1/user"
                 response.contentAsString shouldNotContain "raw-token-and-parser-detail"
             }
         }

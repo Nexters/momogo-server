@@ -39,10 +39,10 @@ class SecurityConfiguration(
             }
             .authorizeHttpRequests { requests ->
                 requests
-                    .requestMatchers(HttpMethod.POST, "/user/register").permitAll()
-                    .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
-                    .requestMatchers(HttpMethod.POST, "/auth/reissue").permitAll()
-                    .requestMatchers(HttpMethod.DELETE, "/auth/logout").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/user/register").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/reissue").permitAll()
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/logout").permitAll()
                     .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                     .anyRequest().authenticated()
             }

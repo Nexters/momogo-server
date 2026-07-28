@@ -37,7 +37,7 @@ class SecurityFilterChainTest(
     given("인증이 필요한 엔드포인트가 있으면") {
         `when`("access token 없이 요청할 때") {
             val result = mockMvc.perform(
-                patch("/user")
+                patch("/api/v1/user")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"nickname":"새닉네임"}"""),
             ).andReturn()
@@ -50,14 +50,14 @@ class SecurityFilterChainTest(
                 response.getHeader(HttpHeaders.WWW_AUTHENTICATE) shouldBe "Bearer"
                 body["status"].intValue() shouldBe 401
                 body["detail"].stringValue() shouldBe ErrorCode.INVALID_AUTH_CREDENTIALS.message
-                body["instance"].stringValue() shouldBe "/user"
+                body["instance"].stringValue() shouldBe "/api/v1/user"
                 result.request.getSession(false) shouldBe null
             }
         }
 
         `when`("파싱할 수 없는 Bearer token으로 요청할 때") {
             val response = mockMvc.perform(
-                patch("/user")
+                patch("/api/v1/user")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer raw.invalid.token")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"nickname":"새닉네임"}"""),
@@ -80,7 +80,7 @@ class SecurityFilterChainTest(
                 jwtEncoder = jwtEncoder,
             )
             val response = mockMvc.perform(
-                patch("/user")
+                patch("/api/v1/user")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"nickname":"새닉네임"}"""),
@@ -96,7 +96,7 @@ class SecurityFilterChainTest(
 
     given("공개 엔드포인트와 같은 경로가 있으면") {
         `when`("허용하지 않은 HTTP 메서드로 요청할 때") {
-            val response = mockMvc.perform(get("/auth/login"))
+            val response = mockMvc.perform(get("/api/v1/auth/login"))
                 .andReturn()
                 .response
 

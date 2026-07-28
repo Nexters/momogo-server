@@ -11,7 +11,7 @@ import jakarta.validation.constraints.Size
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/api/v1/user")
 class UserController(
     private val authService: AuthService,
     private val userService: UserService,

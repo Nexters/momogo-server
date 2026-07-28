@@ -74,7 +74,7 @@ class AuthUserApiIntegrationTest(
         provider: String = "GUEST",
     ): MockHttpServletResponse =
         performJson(
-            post("/user/register"),
+            post("/api/v1/user/register"),
             json(
                 mapOf(
                     "provider" to provider,
@@ -89,7 +89,7 @@ class AuthUserApiIntegrationTest(
         provider: String = "GUEST",
     ): MockHttpServletResponse =
         performJson(
-            post("/auth/login"),
+            post("/api/v1/auth/login"),
             json(
                 mapOf(
                     "provider" to provider,
@@ -100,13 +100,13 @@ class AuthUserApiIntegrationTest(
 
     fun reissue(refreshToken: String): MockHttpServletResponse =
         performJson(
-            post("/auth/reissue"),
+            post("/api/v1/auth/reissue"),
             json(mapOf("refreshToken" to refreshToken)),
         )
 
     fun logout(refreshToken: String): MockHttpServletResponse =
         performJson(
-            delete("/auth/logout"),
+            delete("/api/v1/auth/logout"),
             json(mapOf("refreshToken" to refreshToken)),
         )
 
@@ -114,7 +114,7 @@ class AuthUserApiIntegrationTest(
         accessToken: String?,
         nickname: String,
     ): MockHttpServletResponse {
-        val request = patch("/user")
+        val request = patch("/api/v1/user")
         if (accessToken != null) {
             request.header("Authorization", "Bearer $accessToken")
         }
@@ -123,7 +123,7 @@ class AuthUserApiIntegrationTest(
 
     fun withdraw(accessToken: String): MockHttpServletResponse =
         mockMvc.perform(
-            delete("/user")
+            delete("/api/v1/user")
                 .header("Authorization", "Bearer $accessToken"),
         ).andReturn().response
 
@@ -633,19 +633,19 @@ class AuthUserApiIntegrationTest(
                 cleanDatabase()
                 val invalidResponses = listOf(
                     performJson(
-                        post("/user/register"),
+                        post("/api/v1/user/register"),
                         """{"provider":"GUEST","providerToken":""",
                     ),
                     performJson(
-                        post("/auth/login"),
+                        post("/api/v1/auth/login"),
                         """{"provider":"UNKNOWN","providerToken":"token"}""",
                     ),
                     performJson(
-                        post("/auth/reissue"),
+                        post("/api/v1/auth/reissue"),
                         "{}",
                     ),
                     performJson(
-                        delete("/auth/logout"),
+                        delete("/api/v1/auth/logout"),
                         """{"refreshToken":"   "}""",
                     ),
                     register(
