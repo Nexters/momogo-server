@@ -8,6 +8,7 @@ import io.kotest.engine.concurrency.TestExecutionMode
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
 import io.kotest.matchers.shouldBe
+import jakarta.persistence.Column
 import jakarta.persistence.EntityManager
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
@@ -29,7 +30,7 @@ class UserEntityTest(
     given("회원과 로그인 계정, 리프레시 토큰이 있으면") {
         `when`("하나의 도메인 모델을 JPA 엔티티로 저장할 때") {
             then("연관관계와 감사 시각을 포함해 다시 조회할 수 있다") {
-                val user = User(_nickname = "모고")
+                val user = User(_nickname = "  모고  ")
                 val loginAccount = LoginAccount(
                     _user = user,
                     _provider = LoginProvider.APPLE,
@@ -133,6 +134,36 @@ class UserEntityTest(
         }
     }
 
+    given("이미 저장된 로그인 제공자 계정이 있으면") {
+        `when`("같은 provider와 providerId를 다시 저장할 때") {
+            then("복합 고유 제약으로 저장을 거부한다") {
+                val firstUser = User(_nickname = "첫 회원")
+                val secondUser = User(_nickname = "둘째 회원")
+                entityManager.persist(firstUser)
+                entityManager.persist(secondUser)
+                entityManager.persist(
+                    LoginAccount(
+                        _user = firstUser,
+                        _provider = LoginProvider.GUEST,
+                        _providerId = "guest-token",
+                    ),
+                )
+                entityManager.flush()
+
+                shouldThrow<ConstraintViolationException> {
+                    entityManager.persist(
+                        LoginAccount(
+                            _user = secondUser,
+                            _provider = LoginProvider.GUEST,
+                            _providerId = "guest-token",
+                        ),
+                    )
+                    entityManager.flush()
+                }
+            }
+        }
+    }
+
     given("엔티티의 영속 필드가 캡슐화되어 있으면") {
         then("공개 setter 없이 JPA 기본 생성자와 getter만 제공한다") {
             val entityClasses = listOf(
@@ -149,6 +180,13 @@ class UserEntityTest(
                     method.name.startsWith("set")
                 } shouldBe true
             }
+        }
+
+        then("닉네임 컬럼 길이를 도메인 최대 길이와 같은 12자로 제한한다") {
+            User::class.java
+                .getDeclaredField("_nickname")
+                .getAnnotation(Column::class.java)
+                .length shouldBe 12
         }
     }
 })

@@ -1,12 +1,7 @@
 package com.mogumogu.momogo.user.domain
 
 import com.mogumogu.momogo.global.entity.BaseEntity
-import jakarta.persistence.Column
-import jakarta.persistence.Entity
-import jakarta.persistence.GeneratedValue
-import jakarta.persistence.GenerationType
-import jakarta.persistence.Id
-import jakarta.persistence.Table
+import jakarta.persistence.*
 
 @Entity
 @Table(name = "\"user\"")
@@ -16,7 +11,7 @@ class User(
     @field:Column(name = "id")
     private var _id: Long? = null,
 
-    @field:Column(name = "nickname", nullable = false, length = 255)
+    @field:Column(name = "nickname", nullable = false, length = 12)
     private var _nickname: String,
 ) : BaseEntity() {
 
@@ -27,18 +22,19 @@ class User(
         get() = _nickname
 
     init {
-        validateNickname(_nickname)
+        _nickname = normalizeNickname(_nickname)
     }
 
     fun updateNickname(nickname: String) {
-        validateNickname(nickname)
-        _nickname = nickname
+        _nickname = normalizeNickname(nickname)
     }
 
     private companion object {
-        fun validateNickname(nickname: String) {
-            require(nickname.isNotBlank()) { "닉네임은 비어 있을 수 없습니다." }
-            require(nickname.length <= 255) { "닉네임은 255자를 초과할 수 없습니다." }
+        fun normalizeNickname(nickname: String): String {
+            val normalizedNickname = nickname.trim()
+            require(normalizedNickname.isNotEmpty()) { "닉네임은 비어 있을 수 없습니다." }
+            require(normalizedNickname.length <= 12) { "닉네임은 12자를 초과할 수 없습니다." }
+            return normalizedNickname
         }
     }
 }

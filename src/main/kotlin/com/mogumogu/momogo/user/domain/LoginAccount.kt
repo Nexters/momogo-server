@@ -1,21 +1,18 @@
 package com.mogumogu.momogo.user.domain
 
 import com.mogumogu.momogo.global.entity.BaseEntity
-import jakarta.persistence.Column
-import jakarta.persistence.Entity
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
-import jakarta.persistence.FetchType
-import jakarta.persistence.ForeignKey
-import jakarta.persistence.GeneratedValue
-import jakarta.persistence.GenerationType
-import jakarta.persistence.Id
-import jakarta.persistence.JoinColumn
-import jakarta.persistence.ManyToOne
-import jakarta.persistence.Table
+import jakarta.persistence.*
 
 @Entity
-@Table(name = "login_account")
+@Table(
+    name = "login_account",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uk_login_account_provider_provider_id",
+            columnNames = ["provider", "provider_id"],
+        ),
+    ],
+)
 class LoginAccount(
     @field:Id
     @field:GeneratedValue(strategy = GenerationType.IDENTITY)

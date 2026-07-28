@@ -1,6 +1,10 @@
 spring:
   application:
     name: momogo-server
+  jpa:
+    properties:
+      # DB 제약 위반 메시지에 provider token이나 token hash가 포함되지 않도록 JDBC 원문 오류 로그를 비활성화한다.
+      hibernate.jdbc.log.errors: false
 
 server:
   port: ${SERVER_PORT:8080}
@@ -13,3 +17,10 @@ management:
   endpoint:
     health:
       show-details: never
+
+momogo:
+  security:
+    jwt:
+      issuer: ${JWT_ISSUER:momogo-server}
+      # Base64로 인코딩한 32바이트 이상의 비밀값만 허용하며, 안전하지 않은 기본값을 두지 않는다.
+      secret-base64: ${JWT_SECRET_BASE64}
