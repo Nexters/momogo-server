@@ -17,3 +17,10 @@ spring:
 logging:
   level:
     root: WARN
+
+momogo:
+  security:
+    jwt:
+      issuer: momogo-server-test
+      # test 프로필에서만 사용하는 32바이트 테스트 비밀값
+      secret-base64: bW9tb2dvLXRlc3Qtand0LXNlY3JldC0zMi1ieXRlcyEhISE=

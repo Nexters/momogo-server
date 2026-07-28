@@ -4,7 +4,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 import org.springframework.web.ErrorResponseException
 
-sealed class ApiException protected constructor(
+sealed class ApiException(
     status: HttpStatus,
     val errorCode: ErrorCode,
     detail: String,
@@ -21,6 +21,24 @@ sealed class ApiException protected constructor(
         detail: String = errorCode.message,
     ) : ApiException(
         status = HttpStatus.BAD_REQUEST,
+        errorCode = errorCode,
+        detail = detail,
+    )
+
+    class Unauthorized(
+        errorCode: ErrorCode,
+        detail: String = errorCode.message,
+    ) : ApiException(
+        status = HttpStatus.UNAUTHORIZED,
+        errorCode = errorCode,
+        detail = detail,
+    )
+
+    class Forbidden(
+        errorCode: ErrorCode,
+        detail: String = errorCode.message,
+    ) : ApiException(
+        status = HttpStatus.FORBIDDEN,
         errorCode = errorCode,
         detail = detail,
     )

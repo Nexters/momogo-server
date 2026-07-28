@@ -36,6 +36,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
     implementation 'org.jetbrains.kotlin:kotlin-reflect'
     runtimeOnly 'org.postgresql:postgresql'
     testAndDevelopmentOnly 'com.h2database:h2'
@@ -61,15 +63,15 @@ tasks.named('test') {
 def imageRepository = System.getenv('IMAGE_REPOSITORY') ?: 'ghcr.io/nexters/momogo-server'
 def imageRevision = System.getenv('IMAGE_REVISION') ?: 'local'
 def additionalImageTags = (System.getenv('IMAGE_TAGS') ?: '')
-    .split(',')
-    .collect { it.trim() }
-    .findAll { !it.isEmpty() }
-    .toSet()
+        .split(',')
+        .collect { it.trim() }
+        .findAll { !it.isEmpty() }
+        .toSet()
 def imageArchitectures = (System.getenv('IMAGE_ARCHITECTURES') ?: 'amd64')
-    .split(',')
-    .collect { it.trim() }
-    .findAll { !it.isEmpty() }
-    .toSet()
+        .split(',')
+        .collect { it.trim() }
+        .findAll { !it.isEmpty() }
+        .toSet()
 
 jib {
     from {
@@ -91,8 +93,8 @@ jib {
         user = '1000:1000'
         ports = ['8080']
         labels = [
-            'org.opencontainers.image.source': 'https://github.com/Nexters/momogo-server',
-            'org.opencontainers.image.revision': imageRevision,
+                'org.opencontainers.image.source'  : 'https://github.com/Nexters/momogo-server',
+                'org.opencontainers.image.revision': imageRevision,
         ]
     }
 }
