@@ -35,7 +35,7 @@ class AuthService(
             throw ApiException.Conflict(ErrorCode.DUPLICATE_LOGIN_ACCOUNT)
         }
 
-        val user = userRepository.saveAndFlush(createUser(nickname))
+        val user = userRepository.save(createUser(nickname))
         loginAccountRepository.saveAndFlush(
             LoginAccount(
                 _user = user,

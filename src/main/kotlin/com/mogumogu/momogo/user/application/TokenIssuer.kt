@@ -18,7 +18,7 @@ class TokenIssuer(
         val userId = checkNotNull(user.id) { "토큰 발급 전에 사용자가 저장되어야 합니다." }
         val issuedRefreshToken = refreshTokenProvider.issue()
 
-        refreshTokenRepository.saveAndFlush(
+        refreshTokenRepository.save(
             RefreshToken(
                 _user = user,
                 _tokenHash = issuedRefreshToken.tokenHash,
