@@ -101,4 +101,46 @@ class GroupRepositoryTest(
             }
         }
     }
+
+    given("탈퇴할 회원과 그룹에 남을 회원의 멤버십이 있으면") {
+        `when`("탈퇴할 회원의 멤버십을 모두 삭제할 때") {
+            then("해당 회원의 멤버십만 삭제한다") {
+                val withdrawingUser = userRepository.saveAndFlush(
+                    User(_nickname = "탈퇴 대상"),
+                )
+                val remainingUser = userRepository.saveAndFlush(
+                    User(_nickname = "잔류 회원"),
+                )
+                val group = groupRepository.saveAndFlush(
+                    Group(
+                        _name = "회원 탈퇴 그룹",
+                        _inviteCode = InviteCode(_value = "DELETE"),
+                    ),
+                )
+                val withdrawingMember = GroupMember(
+                    _group = group,
+                    _user = withdrawingUser,
+                ).apply {
+                    leave(Instant.parse("2030-01-01T00:00:00Z"))
+                }
+                groupMemberRepository.saveAndFlush(withdrawingMember)
+                val remainingMember = groupMemberRepository.saveAndFlush(
+                    GroupMember(
+                        _group = group,
+                        _user = remainingUser,
+                    ),
+                )
+
+                groupMemberRepository.deleteAllByUserId(
+                    userId = requireNotNull(withdrawingUser.id),
+                ) shouldBe 1
+
+                groupMemberRepository.findByGroupIdAndUserId(
+                    groupId = requireNotNull(group.id),
+                    userId = requireNotNull(withdrawingUser.id),
+                ) shouldBe null
+                groupMemberRepository.findById(requireNotNull(remainingMember.id)).isPresent shouldBe true
+            }
+        }
+    }
 })

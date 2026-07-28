@@ -2,6 +2,7 @@ package com.mogumogu.momogo.user.application
 
 import com.mogumogu.momogo.global.error.ApiException
 import com.mogumogu.momogo.global.error.ErrorCode
+import com.mogumogu.momogo.group.infra.GroupMemberRepository
 import com.mogumogu.momogo.user.domain.User
 import com.mogumogu.momogo.user.infra.LoginAccountRepository
 import com.mogumogu.momogo.user.infra.RefreshTokenRepository
@@ -14,6 +15,7 @@ class UserService(
     private val userRepository: UserRepository,
     private val loginAccountRepository: LoginAccountRepository,
     private val refreshTokenRepository: RefreshTokenRepository,
+    private val groupMemberRepository: GroupMemberRepository,
 ) {
 
     @Transactional
@@ -36,6 +38,8 @@ class UserService(
     fun withdraw(userId: Long) {
         val user = findUser(userId)
 
+        groupMemberRepository.deleteAllByUserId(userId)
+        groupMemberRepository.flush()
         refreshTokenRepository.deleteAllByUser_Id(userId)
         refreshTokenRepository.flush()
         loginAccountRepository.deleteAllByUser_Id(userId)
