@@ -33,7 +33,7 @@ class GroupEntityTest(
                 val user = User(_nickname = "모고")
                 val group = Group(
                     _name = "모고모고",
-                    _inviteCode = "invite-code-1",
+                    _inviteCode = InviteCode(_value = "AAA111"),
                 )
                 val groupMember = GroupMember(
                     _group = group,
@@ -54,7 +54,7 @@ class GroupEntityTest(
                 val savedGroupMember = entityManager.find(GroupMember::class.java, groupMemberId)
 
                 savedGroup.name shouldBe "모고모고"
-                savedGroup.inviteCode shouldBe "invite-code-1"
+                savedGroup.inviteCode shouldBe InviteCode(_value = "AAA111")
                 savedGroup.updatedAt shouldBeGreaterThanOrEqualTo savedGroup.createdAt
                 savedGroupMember.group.id shouldBe groupId
                 savedGroupMember.user.id shouldBe userId
@@ -70,7 +70,7 @@ class GroupEntityTest(
                 val user = User(_nickname = "모고")
                 val group = Group(
                     _name = "모고모고",
-                    _inviteCode = "invite-code-2",
+                    _inviteCode = InviteCode(_value = "BBB222"),
                 )
                 val groupMember = GroupMember(
                     _group = group,
@@ -86,7 +86,7 @@ class GroupEntityTest(
                 val deletedAt = Instant.parse("2030-01-01T00:00:00Z")
 
                 group.updateName("변경된 그룹")
-                group.regenerateInviteCode("regenerated-invite-code")
+                group.regenerateInviteCode(InviteCode(_value = "CCC333"))
                 groupMember.leave(deletedAt)
                 entityManager.flush()
                 entityManager.clear()
@@ -95,7 +95,7 @@ class GroupEntityTest(
                 val savedGroupMember = entityManager.find(GroupMember::class.java, groupMemberId)
 
                 savedGroup.name shouldBe "변경된 그룹"
-                savedGroup.inviteCode shouldBe "regenerated-invite-code"
+                savedGroup.inviteCode shouldBe InviteCode(_value = "CCC333")
                 savedGroupMember.deletedAt shouldBe deletedAt
                 savedGroupMember.isActive() shouldBe false
             }
@@ -108,7 +108,7 @@ class GroupEntityTest(
                 val user = User(_nickname = "모고")
                 val group = Group(
                     _name = "모고모고",
-                    _inviteCode = "membership-invite-code",
+                    _inviteCode = InviteCode(_value = "DDD444"),
                 )
                 entityManager.persist(user)
                 entityManager.persist(group)
@@ -139,7 +139,7 @@ class GroupEntityTest(
                 entityManager.persist(
                     Group(
                         _name = "첫 번째 그룹",
-                        _inviteCode = "duplicate-invite-code",
+                        _inviteCode = InviteCode(_value = "EEE555"),
                     ),
                 )
                 entityManager.flush()
@@ -148,7 +148,7 @@ class GroupEntityTest(
                     entityManager.persist(
                         Group(
                             _name = "두 번째 그룹",
-                            _inviteCode = "duplicate-invite-code",
+                            _inviteCode = InviteCode(_value = "EEE555"),
                         ),
                     )
                     entityManager.flush()
@@ -162,6 +162,7 @@ class GroupEntityTest(
             listOf(
                 Group::class.java,
                 GroupMember::class.java,
+                InviteCode::class.java,
             ).forEach { entityClass ->
                 entityClass.constructors.any { constructor ->
                     constructor.parameterCount == 0

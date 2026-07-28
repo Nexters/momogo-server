@@ -1,13 +1,7 @@
 package com.mogumogu.momogo.group.domain
 
 import com.mogumogu.momogo.global.entity.BaseEntity
-import jakarta.persistence.Column
-import jakarta.persistence.Entity
-import jakarta.persistence.GeneratedValue
-import jakarta.persistence.GenerationType
-import jakarta.persistence.Id
-import jakarta.persistence.Table
-import jakarta.persistence.UniqueConstraint
+import jakarta.persistence.*
 
 @Entity
 @Table(
@@ -28,8 +22,8 @@ class Group(
     @field:Column(name = "name", nullable = false, length = 255)
     private var _name: String,
 
-    @field:Column(name = "invite_code", nullable = false, length = 255)
-    private var _inviteCode: String,
+    @field:Embedded
+    private var _inviteCode: InviteCode,
 ) : BaseEntity() {
 
     val id: Long?
@@ -38,12 +32,11 @@ class Group(
     val name: String
         get() = _name
 
-    val inviteCode: String
+    val inviteCode: InviteCode
         get() = _inviteCode
 
     init {
         validateName(_name)
-        validateInviteCode(_inviteCode)
     }
 
     fun updateName(name: String) {
@@ -51,20 +44,23 @@ class Group(
         _name = name
     }
 
-    fun regenerateInviteCode(inviteCode: String) {
-        validateInviteCode(inviteCode)
+    fun regenerateInviteCode(inviteCode: InviteCode) {
         _inviteCode = inviteCode
     }
 
+    fun ensureCanJoin(activeMemberCount: Long) {
+        require(activeMemberCount >= 0) { "활성 멤버 수는 0명 이상이어야 합니다." }
+        check(activeMemberCount < MAX_MEMBER_COUNT) {
+            "그룹은 최대 ${MAX_MEMBER_COUNT}명까지 가입할 수 있습니다."
+        }
+    }
+
     private companion object {
+        const val MAX_MEMBER_COUNT = 8L
+
         fun validateName(name: String) {
             require(name.isNotBlank()) { "그룹명은 비어 있을 수 없습니다." }
             require(name.length <= 255) { "그룹명은 255자를 초과할 수 없습니다." }
-        }
-
-        fun validateInviteCode(inviteCode: String) {
-            require(inviteCode.isNotBlank()) { "초대 코드는 비어 있을 수 없습니다." }
-            require(inviteCode.length <= 255) { "초대 코드는 255자를 초과할 수 없습니다." }
         }
     }
 }

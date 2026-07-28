@@ -15,7 +15,22 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         """,
     )
     fun findByGroupIdAndUserId(
-        @Param("groupId") groupId: Long,
-        @Param("userId") userId: Long,
+        @Param("groupId")
+        groupId: Long,
+        @Param("userId")
+        userId: Long,
     ): GroupMember?
+
+    @Query(
+        """
+        SELECT COUNT(gm)
+        FROM GroupMember gm
+        WHERE gm._group._id = :groupId
+          AND gm._deletedAt IS NULL
+        """,
+    )
+    fun countActiveByGroupId(
+        @Param("groupId")
+        groupId: Long,
+    ): Long
 }

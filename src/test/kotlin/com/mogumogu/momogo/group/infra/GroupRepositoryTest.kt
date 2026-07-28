@@ -3,6 +3,7 @@ package com.mogumogu.momogo.group.infra
 import com.mogumogu.momogo.global.config.JpaConfig
 import com.mogumogu.momogo.group.domain.Group
 import com.mogumogu.momogo.group.domain.GroupMember
+import com.mogumogu.momogo.group.domain.InviteCode
 import com.mogumogu.momogo.user.domain.User
 import com.mogumogu.momogo.user.infra.UserRepository
 import io.kotest.core.extensions.ApplyExtension
@@ -13,6 +14,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
+import java.time.Instant
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -34,7 +36,7 @@ class GroupRepositoryTest(
                 val group = groupRepository.saveAndFlush(
                     Group(
                         _name = "모고모고",
-                        _inviteCode = "repository-invite-code",
+                        _inviteCode = InviteCode(_value = "FFF666"),
                     ),
                 )
                 val groupId = requireNotNull(group.id)
@@ -48,7 +50,7 @@ class GroupRepositoryTest(
                 val groupMemberId = requireNotNull(groupMember.id)
 
                 groupRepository.findById(groupId).orElseThrow().name shouldBe "모고모고"
-                groupRepository.findByInviteCode("repository-invite-code")?.id shouldBe groupId
+                groupRepository.findByInviteCode(InviteCode(_value = "FFF666"))?.id shouldBe groupId
                 groupMemberRepository.findById(groupMemberId).orElseThrow().group.id shouldBe groupId
                 groupMemberRepository.findByGroupIdAndUserId(
                     groupId = groupId,
@@ -59,6 +61,43 @@ class GroupRepositoryTest(
                 groupMemberRepository.flush()
 
                 groupMemberRepository.existsById(groupMemberId) shouldBe false
+            }
+        }
+    }
+
+    given("활성 멤버와 탈퇴한 멤버가 있는 그룹이면") {
+        `when`("활성 멤버 수를 조회할 때") {
+            then("탈퇴한 멤버를 제외한 수를 반환한다") {
+                val activeUser = userRepository.saveAndFlush(
+                    User(_nickname = "활성 회원"),
+                )
+                val leftUser = userRepository.saveAndFlush(
+                    User(_nickname = "탈퇴 회원"),
+                )
+                val group = groupRepository.saveAndFlush(
+                    Group(
+                        _name = "인원 제한 그룹",
+                        _inviteCode = InviteCode(_value = "COUNT8"),
+                    ),
+                )
+                val leftMember = GroupMember(
+                    _group = group,
+                    _user = leftUser,
+                ).apply {
+                    leave(Instant.parse("2030-01-01T00:00:00Z"))
+                }
+
+                groupMemberRepository.saveAndFlush(
+                    GroupMember(
+                        _group = group,
+                        _user = activeUser,
+                    ),
+                )
+                groupMemberRepository.saveAndFlush(leftMember)
+
+                groupMemberRepository.countActiveByGroupId(
+                    groupId = requireNotNull(group.id),
+                ) shouldBe 1L
             }
         }
     }

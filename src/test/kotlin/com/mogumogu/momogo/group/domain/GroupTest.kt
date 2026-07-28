@@ -1,6 +1,7 @@
 package com.mogumogu.momogo.group.domain
 
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 
@@ -12,12 +13,12 @@ class GroupTest : BehaviorSpec({
                 val group = Group(
                     _id = 1L,
                     _name = "모고모고",
-                    _inviteCode = "invite-code",
+                    _inviteCode = InviteCode(_value = "ABC123"),
                 )
 
                 group.id shouldBe 1L
                 group.name shouldBe "모고모고"
-                group.inviteCode shouldBe "invite-code"
+                group.inviteCode shouldBe InviteCode(_value = "ABC123")
             }
         }
 
@@ -35,9 +36,45 @@ class GroupTest : BehaviorSpec({
             then("새로운 초대 코드를 조회할 수 있다") {
                 val group = createGroup()
 
-                group.regenerateInviteCode("new-invite-code")
+                group.regenerateInviteCode(InviteCode(_value = "NEW456"))
 
-                group.inviteCode shouldBe "new-invite-code"
+                group.inviteCode shouldBe InviteCode(_value = "NEW456")
+            }
+        }
+    }
+
+    given("활성 멤버가 7명인 그룹이 있으면") {
+        `when`("새로운 회원의 가입 가능 여부를 확인할 때") {
+            then("가입을 허용한다") {
+                val group = createGroup()
+
+                shouldNotThrowAny {
+                    group.ensureCanJoin(activeMemberCount = 7)
+                }
+            }
+        }
+    }
+
+    given("활성 멤버가 8명인 그룹이 있으면") {
+        `when`("새로운 회원의 가입 가능 여부를 확인할 때") {
+            then("가입을 거부한다") {
+                val group = createGroup()
+
+                shouldThrow<IllegalStateException> {
+                    group.ensureCanJoin(activeMemberCount = 8)
+                }.message shouldBe "그룹은 최대 8명까지 가입할 수 있습니다."
+            }
+        }
+    }
+
+    given("유효하지 않은 활성 멤버 수가 있으면") {
+        `when`("가입 가능 여부를 확인할 때") {
+            then("검사를 거부한다") {
+                val group = createGroup()
+
+                shouldThrow<IllegalArgumentException> {
+                    group.ensureCanJoin(activeMemberCount = -1)
+                }.message shouldBe "활성 멤버 수는 0명 이상이어야 합니다."
             }
         }
     }
@@ -49,7 +86,7 @@ class GroupTest : BehaviorSpec({
                     shouldThrow<IllegalArgumentException> {
                         Group(
                             _name = name,
-                            _inviteCode = "invite-code",
+                            _inviteCode = InviteCode(_value = "ABC123"),
                         )
                     }.message shouldBe "그룹명은 비어 있을 수 없습니다."
                 }
@@ -61,7 +98,7 @@ class GroupTest : BehaviorSpec({
                 shouldThrow<IllegalArgumentException> {
                     Group(
                         _name = "가".repeat(256),
-                        _inviteCode = "invite-code",
+                        _inviteCode = InviteCode(_value = "ABC123"),
                     )
                 }.message shouldBe "그룹명은 255자를 초과할 수 없습니다."
             }
@@ -79,48 +116,10 @@ class GroupTest : BehaviorSpec({
             }
         }
     }
-
-    given("유효하지 않은 초대 코드가 있으면") {
-        `when`("빈 초대 코드로 그룹을 생성할 때") {
-            then("생성을 거부한다") {
-                listOf("", " ", "\t").forEach { inviteCode ->
-                    shouldThrow<IllegalArgumentException> {
-                        Group(
-                            _name = "모고모고",
-                            _inviteCode = inviteCode,
-                        )
-                    }.message shouldBe "초대 코드는 비어 있을 수 없습니다."
-                }
-            }
-        }
-
-        `when`("255자를 초과한 초대 코드로 그룹을 생성할 때") {
-            then("생성을 거부한다") {
-                shouldThrow<IllegalArgumentException> {
-                    Group(
-                        _name = "모고모고",
-                        _inviteCode = "a".repeat(256),
-                    )
-                }.message shouldBe "초대 코드는 255자를 초과할 수 없습니다."
-            }
-        }
-
-        `when`("유효하지 않은 초대 코드로 재발급할 때") {
-            then("기존 초대 코드를 유지한다") {
-                val group = createGroup()
-
-                shouldThrow<IllegalArgumentException> {
-                    group.regenerateInviteCode("")
-                }
-
-                group.inviteCode shouldBe "invite-code"
-            }
-        }
-    }
 })
 
 private fun createGroup(): Group =
     Group(
         _name = "모고모고",
-        _inviteCode = "invite-code",
+        _inviteCode = InviteCode(_value = "ABC123"),
     )

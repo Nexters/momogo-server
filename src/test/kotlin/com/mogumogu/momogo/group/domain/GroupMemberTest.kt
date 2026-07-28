@@ -75,5 +75,5 @@ private fun createGroupMember(): GroupMember =
 private fun createGroupForMember(): Group =
     Group(
         _name = "모고모고",
-        _inviteCode = "invite-code",
+        _inviteCode = InviteCode(_value = "MEMBER"),
     )
