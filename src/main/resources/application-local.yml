@@ -22,3 +22,9 @@ spring:
 logging:
   level:
     com.mogumogu.momogo: DEBUG
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
