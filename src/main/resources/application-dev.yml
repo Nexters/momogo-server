@@ -19,3 +19,13 @@ logging:
   level:
     root: INFO
     com.mogumogu.momogo: DEBUG
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+momogo:
+  openapi:
+    server-url: https://api.dev.mogumogo.com

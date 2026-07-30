@@ -42,4 +42,16 @@ class MomogoServerApplicationTests(
         }
     }
 
+    given("기본 test 프로필에서 Swagger 문서가 비활성화된 상태에서") {
+        `when`("OpenAPI 문서를 요청하면") {
+            val response = mockMvc.perform(get("/v3/api-docs"))
+                .andReturn()
+                .response
+
+            then("문서 엔드포인트를 노출하지 않는다") {
+                response.status shouldBe HttpStatus.NOT_FOUND.value()
+            }
+        }
+    }
+
 })
