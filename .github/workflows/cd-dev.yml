@@ -49,8 +49,8 @@ jobs:
             CONTAINER_NAME="momogo-dev"
             HEALTH_URL="http://localhost:8081/actuator/health"
 
-            if [ ! -f "${CONFIG_DIR}/application-dev.properties" ]; then
-              echo "오류: 설정 파일 없음 — ${CONFIG_DIR}/application-dev.properties" >&2
+            if [ ! -f "${CONFIG_DIR}/application-dev.yml" ]; then
+              echo "오류: 설정 파일 없음 — ${CONFIG_DIR}/application-dev.yml" >&2
               exit 1
             fi
 
