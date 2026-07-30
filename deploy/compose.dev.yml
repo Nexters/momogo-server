@@ -1,0 +1,30 @@
+name: momogo-dev
+
+services:
+  app:
+    image: ${IMAGE_REFERENCE:?IMAGE_REFERENCE is required}
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:${HOST_PORT:-8081}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SERVER_PORT: "8080"
+      DB_HOST: ${DB_HOST:?DB_HOST is required}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      JWT_ISSUER: ${JWT_ISSUER:-momogo-server}
+      JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:?JWT_SECRET_BASE64 is required}
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

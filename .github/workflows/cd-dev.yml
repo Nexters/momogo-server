@@ -25,13 +25,28 @@ jobs:
     name: Deploy to dev
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: dev
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
     env:
       IMAGE_REVISION: ${{ inputs.revision || github.event.workflow_run.head_sha || github.sha }}
 
     steps:
-      - name: Configure image repository
-        run: echo "IMAGE_REPOSITORY=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - name: Checkout deployment files
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.IMAGE_REVISION }}
+
+      - name: Upload deployment files
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.SERVER_FINGERPRINT }}
+          source: deploy/compose.dev.yml,scripts/deploy.sh
+          target: /opt/momogo/deploy/dev
+          overwrite: true
 
       - name: Deploy to dev server
         uses: appleboy/ssh-action@v1.2.0
@@ -43,44 +58,9 @@ jobs:
           port: ${{ secrets.SERVER_PORT }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: IMAGE_REPOSITORY,IMAGE_REVISION,GHCR_TOKEN,GHCR_ACTOR
+          fingerprint: ${{ secrets.SERVER_FINGERPRINT }}
+          envs: IMAGE_REVISION,GHCR_TOKEN,GHCR_ACTOR
           script: |
-            CONFIG_DIR="/opt/momogo/config/dev"
-            CONTAINER_NAME="momogo-dev"
-            HEALTH_URL="http://localhost:8081/actuator/health"
-
-            if [ ! -f "${CONFIG_DIR}/application-dev.yml" ]; then
-              echo "오류: 설정 파일 없음 — ${CONFIG_DIR}/application-dev.yml" >&2
-              exit 1
-            fi
-
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
-            docker pull "${IMAGE_REPOSITORY}:${IMAGE_REVISION}"
-
-            if docker ps -a --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
-              docker stop "${CONTAINER_NAME}" > /dev/null
-              docker rm "${CONTAINER_NAME}" > /dev/null
-            fi
-
-            docker run -d \
-              --name "${CONTAINER_NAME}" \
-              --restart unless-stopped \
-              -p 8081:8080 \
-              -e SPRING_PROFILES_ACTIVE=dev \
-              -e SPRING_CONFIG_ADDITIONAL_LOCATION="file:/config/" \
-              -v "${CONFIG_DIR}:/config:ro" \
-              "${IMAGE_REPOSITORY}:${IMAGE_REVISION}"
-
-            for i in $(seq 1 20); do
-              if curl -sf "${HEALTH_URL}" | grep -q '"status":"UP"'; then
-                echo "헬스체크 성공 (${i}회차)"
-                docker image prune -f > /dev/null
-                exit 0
-              fi
-              echo "헬스체크 대기 중... (${i}/20)"
-              sleep 3
-            done
-
-            echo "헬스체크 실패. 최근 로그:" >&2
-            docker logs --tail 50 "${CONTAINER_NAME}" || true
-            exit 1
+            cd /opt/momogo/deploy/dev
+            chmod +x ./scripts/deploy.sh
+            ./scripts/deploy.sh dev "$IMAGE_REVISION"
