@@ -52,9 +52,10 @@ class OpenApiDocumentationTest(
                     "회원가입 또는 로그인 후 받은 액세스 토큰을 입력합니다."
             }
 
-            then("보호된 사용자 API에만 Bearer 인증을 표시한다") {
+            then("보호된 사용자와 그룹 API에 Bearer 인증을 표시한다") {
                 document.operation("/api/v1/user", "patch").requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/user", "delete").requiresBearerAuth() shouldBe true
+                document.operation("/api/v1/groups", "post").requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/user/register", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/login", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/reissue", "post").requiresBearerAuth() shouldBe false
@@ -69,6 +70,8 @@ class OpenApiDocumentationTest(
                     .stringValue() shouldBe commonResponseRef
                 document.operation("/api/v1/user", "delete")["responses"]["401"]["\$ref"]
                     .stringValue() shouldBe commonResponseRef
+                document.operation("/api/v1/groups", "post")["responses"]["401"]["\$ref"]
+                    .stringValue() shouldBe commonResponseRef
 
                 val commonResponse = document["components"]["responses"][
                     OpenApiConfiguration.BEARER_UNAUTHORIZED_RESPONSE
@@ -81,15 +84,17 @@ class OpenApiDocumentationTest(
             then("서버가 주입하는 userId를 요청 파라미터로 노출하지 않는다") {
                 document.operation("/api/v1/user", "patch").hasParameter("userId") shouldBe false
                 document.operation("/api/v1/user", "delete").hasParameter("userId") shouldBe false
+                document.operation("/api/v1/groups", "post").hasParameter("userId") shouldBe false
             }
 
-            then("user와 auth API의 설명과 주요 응답을 제공한다") {
+            then("user, auth와 group API의 설명과 주요 응답을 제공한다") {
                 val register = document.operation("/api/v1/user/register", "post")
                 val login = document.operation("/api/v1/auth/login", "post")
                 val reissue = document.operation("/api/v1/auth/reissue", "post")
                 val logout = document.operation("/api/v1/auth/logout", "delete")
                 val updateNickname = document.operation("/api/v1/user", "patch")
                 val withdraw = document.operation("/api/v1/user", "delete")
+                val createGroup = document.operation("/api/v1/groups", "post")
 
                 register["summary"].stringValue() shouldBe "회원가입"
                 register.responseCodes() shouldBe setOf("200", "400", "409")
@@ -106,6 +111,10 @@ class OpenApiDocumentationTest(
                 updateNickname.responseCodes() shouldBe setOf("200", "400", "401", "404")
                 withdraw["summary"].stringValue() shouldBe "회원 탈퇴"
                 withdraw.responseCodes() shouldBe setOf("200", "401", "404")
+                createGroup["summary"].stringValue() shouldBe "그룹 생성"
+                createGroup.responseCodes() shouldBe setOf("200", "400", "401", "404")
+                createGroup.hasResponseMediaType("200", "application/json") shouldBe true
+                createGroup.hasResponseMediaType("400", "application/problem+json") shouldBe true
             }
 
             then("요청 스키마에 현재 지원 범위와 입력 제한을 표시한다") {
@@ -130,6 +139,12 @@ class OpenApiDocumentationTest(
                     setOf("accessToken", "refreshToken")
                 schemas["UserResponse"]["required"].stringValues().toSet() shouldBe
                     setOf("userId", "nickname")
+                schemas["CreateGroupRequest"]["properties"]["name"]["maxLength"]
+                    .intValue() shouldBe 255
+                schemas["CreateGroupRequest"]["required"].stringValues().toSet() shouldBe
+                    setOf("name")
+                schemas["CreateGroupResponse"]["required"].stringValues().toSet() shouldBe
+                    setOf("groupId", "groupName", "inviteCode")
             }
         }
 
