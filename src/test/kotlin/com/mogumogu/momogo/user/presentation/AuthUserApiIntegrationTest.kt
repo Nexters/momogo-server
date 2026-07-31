@@ -7,6 +7,10 @@ import com.mogumogu.momogo.group.domain.GroupMember
 import com.mogumogu.momogo.group.domain.InviteCode
 import com.mogumogu.momogo.group.infra.GroupMemberRepository
 import com.mogumogu.momogo.group.infra.GroupRepository
+import com.mogumogu.momogo.photo.domain.Photo
+import com.mogumogu.momogo.photo.domain.PhotoGroup
+import com.mogumogu.momogo.photo.infra.PhotoGroupRepository
+import com.mogumogu.momogo.photo.infra.PhotoRepository
 import com.mogumogu.momogo.user.domain.LoginProvider
 import com.mogumogu.momogo.user.domain.RefreshToken
 import com.mogumogu.momogo.user.infra.LoginAccountRepository
@@ -30,6 +34,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
+import org.springframework.transaction.support.TransactionTemplate
 import tools.jackson.databind.ObjectMapper
 import java.time.Clock
 import java.time.Duration
@@ -49,15 +54,20 @@ class AuthUserApiIntegrationTest(
     private val refreshTokenRepository: RefreshTokenRepository,
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val photoRepository: PhotoRepository,
+    private val photoGroupRepository: PhotoGroupRepository,
     private val refreshTokenProvider: RefreshTokenProvider,
     private val jwtEncoder: JwtEncoder,
     private val jwtDecoder: JwtDecoder,
     private val jwtProperties: JwtProperties,
     private val clock: Clock,
+    private val transactionTemplate: TransactionTemplate,
 ) : BehaviorSpec({
     testExecutionMode = TestExecutionMode.Sequential
 
     fun cleanDatabase() {
+        photoGroupRepository.deleteAllInBatch()
+        photoRepository.deleteAllInBatch()
         groupMemberRepository.deleteAllInBatch()
         groupRepository.deleteAllInBatch()
         refreshTokenRepository.deleteAllInBatch()
@@ -604,9 +614,9 @@ class AuthUserApiIntegrationTest(
         }
     }
 
-    given("로그인 계정과 여러 refresh token 및 그룹 멤버십을 가진 사용자가 있으면") {
+    given("로그인 계정과 여러 refresh token, 그룹 멤버십 및 사진을 가진 사용자가 있으면") {
         `when`("access token으로 회원 탈퇴할 때") {
-            then("인증 정보와 그룹 멤버십을 삭제하고 그룹은 유지한다") {
+            then("인증 정보와 그룹 멤버십을 삭제하고 그룹과 업로더가 제거된 사진은 유지한다") {
                 cleanDatabase()
                 val providerToken = "withdraw-guest"
                 val registerBody = objectMapper.readTree(register(providerToken).contentAsString)
@@ -627,6 +637,22 @@ class AuthUserApiIntegrationTest(
                         _user = user,
                     ),
                 )
+                val photo = photoRepository.saveAndFlush(
+                    Photo(
+                        _uploader = user,
+                        _objectKey = "withdraw/$userId/photo.jpg",
+                        _sizeBytes = 1_024L,
+                        _contentType = "image/jpeg",
+                    ),
+                )
+                val photoId = requireNotNull(photo.id)
+                val photoGroup = photoGroupRepository.saveAndFlush(
+                    PhotoGroup(
+                        _photo = photo,
+                        _group = group,
+                    ),
+                )
+                val photoGroupId = requireNotNull(photoGroup.id)
 
                 val response = withdraw(accessToken)
 
@@ -637,6 +663,16 @@ class AuthUserApiIntegrationTest(
                 refreshTokenRepository.count() shouldBe 0L
                 groupMemberRepository.count() shouldBe 0L
                 groupRepository.existsById(requireNotNull(group.id)) shouldBe true
+                photoRepository.count() shouldBe 1L
+                val remainingPhoto = photoRepository.findById(photoId).orElseThrow()
+                remainingPhoto.uploader shouldBe null
+                remainingPhoto.objectKey shouldBe "withdraw/$userId/photo.jpg"
+                photoGroupRepository.count() shouldBe 1L
+                transactionTemplate.executeWithoutResult {
+                    val remainingPhotoGroup = photoGroupRepository.findById(photoGroupId).orElseThrow()
+                    remainingPhotoGroup.photo.id shouldBe photoId
+                    remainingPhotoGroup.group.id shouldBe group.id
+                }
 
                 assertProblem(
                     response = updateNickname(accessToken, "탈퇴 후"),

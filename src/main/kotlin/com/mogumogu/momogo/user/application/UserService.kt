@@ -3,6 +3,7 @@ package com.mogumogu.momogo.user.application
 import com.mogumogu.momogo.global.error.ApiException
 import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.group.infra.GroupMemberRepository
+import com.mogumogu.momogo.photo.infra.PhotoRepository
 import com.mogumogu.momogo.user.domain.User
 import com.mogumogu.momogo.user.infra.LoginAccountRepository
 import com.mogumogu.momogo.user.infra.RefreshTokenRepository
@@ -16,6 +17,7 @@ class UserService(
     private val loginAccountRepository: LoginAccountRepository,
     private val refreshTokenRepository: RefreshTokenRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val photoRepository: PhotoRepository,
 ) {
 
     @Transactional
@@ -44,6 +46,7 @@ class UserService(
         refreshTokenRepository.flush()
         loginAccountRepository.deleteAllByUser_Id(userId)
         loginAccountRepository.flush()
+        photoRepository.clearUploaderByUserId(userId)
         userRepository.delete(user)
         userRepository.flush()
     }
