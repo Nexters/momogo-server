@@ -2,6 +2,11 @@ package com.mogumogu.momogo.user.presentation
 
 import com.mogumogu.momogo.global.token.JwtProperties
 import com.mogumogu.momogo.global.token.RefreshTokenProvider
+import com.mogumogu.momogo.group.domain.Group
+import com.mogumogu.momogo.group.domain.GroupMember
+import com.mogumogu.momogo.group.domain.InviteCode
+import com.mogumogu.momogo.group.infra.GroupMemberRepository
+import com.mogumogu.momogo.group.infra.GroupRepository
 import com.mogumogu.momogo.user.domain.LoginProvider
 import com.mogumogu.momogo.user.domain.RefreshToken
 import com.mogumogu.momogo.user.infra.LoginAccountRepository
@@ -42,6 +47,8 @@ class AuthUserApiIntegrationTest(
     private val userRepository: UserRepository,
     private val loginAccountRepository: LoginAccountRepository,
     private val refreshTokenRepository: RefreshTokenRepository,
+    private val groupRepository: GroupRepository,
+    private val groupMemberRepository: GroupMemberRepository,
     private val refreshTokenProvider: RefreshTokenProvider,
     private val jwtEncoder: JwtEncoder,
     private val jwtDecoder: JwtDecoder,
@@ -51,6 +58,8 @@ class AuthUserApiIntegrationTest(
     testExecutionMode = TestExecutionMode.Sequential
 
     fun cleanDatabase() {
+        groupMemberRepository.deleteAllInBatch()
+        groupRepository.deleteAllInBatch()
         refreshTokenRepository.deleteAllInBatch()
         loginAccountRepository.deleteAllInBatch()
         userRepository.deleteAllInBatch()
@@ -595,15 +604,29 @@ class AuthUserApiIntegrationTest(
         }
     }
 
-    given("로그인 계정과 여러 refresh token을 가진 사용자가 있으면") {
+    given("로그인 계정과 여러 refresh token 및 그룹 멤버십을 가진 사용자가 있으면") {
         `when`("access token으로 회원 탈퇴할 때") {
-            then("연관 데이터를 모두 물리 삭제하고 남은 access token은 사용자 조회에서 404가 된다") {
+            then("인증 정보와 그룹 멤버십을 삭제하고 그룹은 유지한다") {
                 cleanDatabase()
                 val providerToken = "withdraw-guest"
                 val registerBody = objectMapper.readTree(register(providerToken).contentAsString)
                 val loginBody = objectMapper.readTree(login(providerToken).contentAsString)
                 val accessToken = registerBody["accessToken"].stringValue()
                 val refreshToken = loginBody["refreshToken"].stringValue()
+                val userId = registerBody["userId"].longValue()
+                val user = userRepository.findById(userId).orElseThrow()
+                val group = groupRepository.saveAndFlush(
+                    Group(
+                        _name = "탈퇴 테스트 그룹",
+                        _inviteCode = InviteCode(_value = "LEAVE1"),
+                    ),
+                )
+                groupMemberRepository.saveAndFlush(
+                    GroupMember(
+                        _group = group,
+                        _user = user,
+                    ),
+                )
 
                 val response = withdraw(accessToken)
 
@@ -612,6 +635,8 @@ class AuthUserApiIntegrationTest(
                 userRepository.count() shouldBe 0L
                 loginAccountRepository.count() shouldBe 0L
                 refreshTokenRepository.count() shouldBe 0L
+                groupMemberRepository.count() shouldBe 0L
+                groupRepository.existsById(requireNotNull(group.id)) shouldBe true
 
                 assertProblem(
                     response = updateNickname(accessToken, "탈퇴 후"),
