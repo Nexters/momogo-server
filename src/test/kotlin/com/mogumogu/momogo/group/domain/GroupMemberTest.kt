@@ -1,6 +1,8 @@
 package com.mogumogu.momogo.group.domain
 
 import com.mogumogu.momogo.user.domain.User
+import io.kotest.assertions.throwables.shouldNotThrowAny
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import java.time.Instant
@@ -37,6 +39,16 @@ class GroupMemberTest : BehaviorSpec({
                 groupMember.isActive() shouldBe false
             }
         }
+
+        `when`("새 멤버십으로 교체할 수 있는지 확인할 때") {
+            then("활성 멤버십은 교체를 거부한다") {
+                val groupMember = createGroupMember()
+
+                shouldThrow<IllegalStateException> {
+                    groupMember.ensureCanBeReplaced()
+                }.message shouldBe "활성 멤버십은 새 멤버십으로 교체할 수 없습니다."
+            }
+        }
     }
 
     given("이미 그룹에서 나간 회원이 있으면") {
@@ -52,15 +64,14 @@ class GroupMemberTest : BehaviorSpec({
             }
         }
 
-        `when`("그룹에 재가입할 때") {
-            then("기존 멤버십이 다시 활성 상태가 된다") {
+        `when`("새 멤버십으로 교체할 수 있는지 확인할 때") {
+            then("탈퇴한 멤버십은 교체를 허용한다") {
                 val groupMember = createGroupMember()
                 groupMember.leave(Instant.parse("2030-01-01T00:00:00Z"))
 
-                groupMember.rejoin()
-
-                groupMember.deletedAt shouldBe null
-                groupMember.isActive() shouldBe true
+                shouldNotThrowAny {
+                    groupMember.ensureCanBeReplaced()
+                }
             }
         }
     }

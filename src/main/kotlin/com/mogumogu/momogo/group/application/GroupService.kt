@@ -4,6 +4,7 @@ import com.mogumogu.momogo.global.error.ApiException
 import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.group.domain.Group
 import com.mogumogu.momogo.group.domain.GroupMember
+import com.mogumogu.momogo.group.domain.InviteCode
 import com.mogumogu.momogo.group.infra.GroupMemberRepository
 import com.mogumogu.momogo.group.infra.GroupRepository
 import com.mogumogu.momogo.user.infra.UserRepository
@@ -20,8 +21,7 @@ class GroupService(
 
     @Transactional
     fun create(command: CreateGroupCommand): CreateGroupResult {
-        val user = userRepository.findById(command.userId)
-            .orElseThrow { ApiException.NotFound(ErrorCode.USER_NOT_FOUND) }
+        val user = findUserForUpdate(command.userId)
         val group = groupRepository.save(createGroup(command.name))
 
         groupMemberRepository.save(
@@ -32,9 +32,66 @@ class GroupService(
         )
 
         return CreateGroupResult(
-            groupId = checkNotNull(group.id) { "저장된 그룹 ID가 없습니다." },
+            groupId = group.id!!,
             name = group.name,
             inviteCode = group.inviteCode.value,
+        )
+    }
+
+    @Transactional(readOnly = true)
+    fun getInvitation(command: GetGroupInvitationCommand): GroupInvitationResult {
+        val group = findGroupByInviteCode(command.code)
+        val groupId = group.id!!
+        val membership = groupMemberRepository.findByGroupIdAndUserId(
+            groupId = groupId,
+            userId = command.userId,
+        )
+
+        return GroupInvitationResult(
+            groupId = groupId,
+            groupName = group.name,
+            totalMemberCount = groupMemberRepository.countActiveByGroupId(groupId),
+            participated = membership?.isActive() == true,
+        )
+    }
+
+    @Transactional
+    fun join(command: JoinGroupCommand): JoinGroupResult {
+        val user = findUserForUpdate(command.userId)
+        val inviteCode = parseInviteCode(command.code)
+        val group = groupRepository.findByInviteCodeForUpdate(inviteCode)
+            ?: throw ApiException.NotFound(ErrorCode.INVALID_INVITATION_CODE)
+        val groupId = group.id!!
+        val membership = groupMemberRepository.findByGroupIdAndUserId(
+            groupId = groupId,
+            userId = command.userId,
+        )
+
+        try {
+            membership?.ensureCanBeReplaced()
+        } catch (_: IllegalStateException) {
+            throw ApiException.Conflict(ErrorCode.ALREADY_JOINED)
+        }
+
+        ensureGroupCanJoin(
+            group = group,
+            activeMemberCount = groupMemberRepository.countActiveByGroupId(groupId),
+        )
+
+        if (membership != null) {
+            groupMemberRepository.delete(membership)
+            groupMemberRepository.flush()
+        }
+        groupMemberRepository.save(
+            GroupMember(
+                _group = group,
+                _user = user,
+            ),
+        )
+
+        return JoinGroupResult(
+            groupId = groupId,
+            code = group.inviteCode.value,
         )
     }
 
@@ -47,6 +104,32 @@ class GroupService(
         } catch (_: IllegalArgumentException) {
             throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
         }
+
+    private fun findGroupByInviteCode(code: String): Group =
+        groupRepository.findByInviteCode(parseInviteCode(code))
+            ?: throw ApiException.NotFound(ErrorCode.INVALID_INVITATION_CODE)
+
+    private fun parseInviteCode(code: String): InviteCode =
+        try {
+            InviteCode(_value = code)
+        } catch (_: IllegalArgumentException) {
+            throw ApiException.NotFound(ErrorCode.INVALID_INVITATION_CODE)
+        }
+
+    private fun findUserForUpdate(userId: Long) =
+        userRepository.findByIdForUpdate(userId)
+            ?: throw ApiException.NotFound(ErrorCode.USER_NOT_FOUND)
+
+    private fun ensureGroupCanJoin(
+        group: Group,
+        activeMemberCount: Long,
+    ) {
+        try {
+            group.ensureCanJoin(activeMemberCount)
+        } catch (_: IllegalStateException) {
+            throw ApiException.Conflict(ErrorCode.GROUP_FULL)
+        }
+    }
 }
 
 data class CreateGroupCommand(
@@ -58,4 +141,26 @@ data class CreateGroupResult(
     val groupId: Long,
     val name: String,
     val inviteCode: String,
+)
+
+data class GetGroupInvitationCommand(
+    val userId: Long,
+    val code: String,
+)
+
+data class GroupInvitationResult(
+    val groupId: Long,
+    val groupName: String,
+    val totalMemberCount: Long,
+    val participated: Boolean,
+)
+
+data class JoinGroupCommand(
+    val userId: Long,
+    val code: String,
+)
+
+data class JoinGroupResult(
+    val groupId: Long,
+    val code: String,
 )

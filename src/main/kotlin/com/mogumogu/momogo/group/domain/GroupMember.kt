@@ -61,8 +61,8 @@ class GroupMember(
         }
     }
 
-    fun rejoin() {
-        _deletedAt = null
+    fun ensureCanBeReplaced() {
+        check(!isActive()) { "활성 멤버십은 새 멤버십으로 교체할 수 없습니다." }
     }
 
     fun isActive(): Boolean = _deletedAt == null

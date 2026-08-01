@@ -196,13 +196,16 @@ class AuthUserApiIntegrationTest(
         return parts.joinToString(".")
     }
 
-    fun runConcurrently(request: () -> MockHttpServletResponse): List<MockHttpServletResponse> {
+    fun runConcurrently(
+        firstRequest: () -> MockHttpServletResponse,
+        secondRequest: () -> MockHttpServletResponse,
+    ): List<MockHttpServletResponse> {
         val executor = Executors.newFixedThreadPool(2)
         val ready = CountDownLatch(2)
         val start = CountDownLatch(1)
 
         return try {
-            val futures = (1..2).map {
+            val futures = listOf(firstRequest, secondRequest).map { request ->
                 executor.submit<MockHttpServletResponse> {
                     ready.countDown()
                     check(start.await(5, TimeUnit.SECONDS)) {
@@ -220,6 +223,9 @@ class AuthUserApiIntegrationTest(
             executor.shutdownNow()
         }
     }
+
+    fun runConcurrently(request: () -> MockHttpServletResponse): List<MockHttpServletResponse> =
+        runConcurrently(request, request)
 
     given("유효한 Guest 회원가입 요청이 있으면") {
         `when`("UUID가 아닌 원문 providerToken과 공백이 있는 닉네임으로 가입할 때") {
@@ -684,6 +690,42 @@ class AuthUserApiIntegrationTest(
                     status = HttpStatus.UNAUTHORIZED,
                     detail = "유효하지 않은 리프레시 토큰입니다.",
                 )
+            }
+        }
+    }
+
+    given("같은 사용자의 토큰 재발급과 회원 탈퇴 요청이 동시에 도착하면") {
+        `when`("두 요청을 함께 처리할 때") {
+            then("회원 탈퇴를 완료하고 사용자와 refresh token을 남기지 않는다") {
+                cleanDatabase()
+                val registerBody = objectMapper.readTree(
+                    register("concurrent-reissue-withdraw").contentAsString,
+                )
+                val accessToken = registerBody["accessToken"].stringValue()
+                val refreshToken = registerBody["refreshToken"].stringValue()
+
+                val responses = runConcurrently(
+                    firstRequest = { reissue(refreshToken) },
+                    secondRequest = { withdraw(accessToken) },
+                )
+                val reissueResponse = responses[0]
+                val withdrawResponse = responses[1]
+
+                assertJsonResponse(withdrawResponse)
+                (reissueResponse.status in setOf(
+                    HttpStatus.OK.value(),
+                    HttpStatus.UNAUTHORIZED.value(),
+                )) shouldBe true
+                if (reissueResponse.status == HttpStatus.UNAUTHORIZED.value()) {
+                    assertProblem(
+                        response = reissueResponse,
+                        status = HttpStatus.UNAUTHORIZED,
+                        detail = "유효하지 않은 리프레시 토큰입니다.",
+                    )
+                }
+                userRepository.count() shouldBe 0L
+                loginAccountRepository.count() shouldBe 0L
+                refreshTokenRepository.count() shouldBe 0L
             }
         }
     }

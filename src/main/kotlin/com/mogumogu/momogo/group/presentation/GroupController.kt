@@ -3,7 +3,9 @@ package com.mogumogu.momogo.group.presentation
 import com.mogumogu.momogo.global.config.OpenApiConfiguration
 import com.mogumogu.momogo.global.security.RequestUserId
 import com.mogumogu.momogo.group.application.CreateGroupCommand
+import com.mogumogu.momogo.group.application.GetGroupInvitationCommand
 import com.mogumogu.momogo.group.application.GroupService
+import com.mogumogu.momogo.group.application.JoinGroupCommand
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -15,9 +17,11 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.springframework.http.ProblemDetail
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @Tag(
@@ -90,6 +94,116 @@ class GroupController(
             inviteCode = result.inviteCode,
         )
     }
+
+    @Operation(
+        summary = "초대 코드로 그룹 정보 확인",
+        description = "그룹에 참여하기 전에 초대 코드에 해당하는 그룹 정보와 현재 참여 여부를 확인합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "그룹 정보 확인 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = GroupInvitationResponse::class),
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "유효하지 않은 초대 코드",
+                content = [
+                    Content(
+                        mediaType = "application/problem+json",
+                        schema = Schema(implementation = ProblemDetail::class),
+                    ),
+                ],
+            ),
+        ],
+    )
+    @GetMapping("/invitations")
+    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
+    fun getInvitation(
+        @RequestUserId
+        userId: Long,
+        @RequestParam
+        code: String,
+    ): GroupInvitationResponse {
+        val result = groupService.getInvitation(
+            GetGroupInvitationCommand(
+                userId = userId,
+                code = code,
+            ),
+        )
+
+        return GroupInvitationResponse(
+            groupId = result.groupId,
+            groupName = result.groupName,
+            totalMemberCount = result.totalMemberCount,
+            participated = result.participated,
+        )
+    }
+
+    @Operation(
+        summary = "초대 코드로 그룹 참여",
+        description = "초대 코드에 해당하는 그룹에 현재 사용자를 멤버로 등록합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "그룹 참여 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = JoinGroupResponse::class),
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "유효하지 않은 초대 코드 또는 사용자를 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = "application/problem+json",
+                        schema = Schema(implementation = ProblemDetail::class),
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "이미 가입한 그룹 또는 그룹 최대 인원 초과",
+                content = [
+                    Content(
+                        mediaType = "application/problem+json",
+                        schema = Schema(implementation = ProblemDetail::class),
+                    ),
+                ],
+            ),
+        ],
+    )
+    @PostMapping("/invitations")
+    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
+    fun join(
+        @RequestUserId
+        userId: Long,
+        @RequestBody
+        request: JoinGroupRequest,
+    ): JoinGroupResponse {
+        val result = groupService.join(
+            JoinGroupCommand(
+                userId = userId,
+                code = request.code,
+            ),
+        )
+
+        return JoinGroupResponse(
+            groupId = result.groupId,
+            code = result.code,
+        )
+    }
 }
 
 @Schema(description = "그룹 생성 요청")
@@ -128,4 +242,66 @@ data class CreateGroupResponse(
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val inviteCode: String,
+)
+
+@Schema(description = "초대 코드로 확인한 그룹 정보")
+data class GroupInvitationResponse(
+    @field:Schema(
+        description = "그룹 ID",
+        example = "10",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val groupId: Long,
+
+    @field:Schema(
+        description = "그룹명",
+        example = "우리 가족",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val groupName: String,
+
+    @field:Schema(
+        description = "현재 그룹에 참여 중인 멤버 수",
+        example = "4",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val totalMemberCount: Long,
+
+    @field:Schema(
+        description = "현재 사용자의 그룹 참여 여부",
+        example = "false",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val participated: Boolean,
+)
+
+@Schema(description = "초대 코드로 그룹 참여 요청")
+data class JoinGroupRequest(
+    @field:Schema(
+        description = "그룹 초대 코드",
+        example = "A1B2C3",
+        minLength = 6,
+        maxLength = 6,
+        pattern = "^[A-Z0-9]{6}$",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val code: String,
+)
+
+@Schema(description = "초대 코드로 그룹 참여 응답")
+data class JoinGroupResponse(
+    @field:Schema(
+        description = "참여한 그룹 ID",
+        example = "10",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val groupId: Long,
+
+    @field:Schema(
+        description = "사용한 그룹 초대 코드",
+        example = "A1B2C3",
+        pattern = "^[A-Z0-9]{6}$",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val code: String,
 )
