@@ -27,9 +27,9 @@ dev와 prod 배포에서는 Docker Compose가 프로필을 지정하며, 테스�
 
 ## Cloudflare R2 설정
 
-현재는 사진 API를 구현하지 않고 Cloudflare R2 연결에 필요한 `S3Client`, `S3Presigner`와 환경설정만 구성한다. R2의 S3 API region은 `auto`를 사용한다.
+`POST /api/v1/photos/upload-urls`는 클라이언트가 Cloudflare R2에 이미지를 직접 PUT할 수 있는 15분 유효 presigned URL을 발급한다. R2의 S3 API region은 `auto`를 사용한다.
 
-local, dev, prod는 서로 다른 버킷을 사용한다. local의 기본 버킷 이름은 `momogo-local`이며, dev와 prod는 각각의 배포 환경 파일에 서로 다른 `R2_BUCKET`을 설정한다.
+local과 dev는 같은 개발 버킷을 사용하고 오브젝트 키의 `local/`, `dev/` 접두사로 데이터를 구분할 수 있다. prod는 개발 환경과 분리된 버킷을 사용한다. local의 `R2_BUCKET`을 설정하지 않으면 실행용 기본값인 `momogo-local`을 사용한다.
 
 - `R2_ENDPOINT`: `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` 형식의 R2 S3 API 주소
 - `R2_BUCKET`: 현재 환경에서 사용할 버킷 이름
@@ -38,6 +38,8 @@ local, dev, prod는 서로 다른 버킷을 사용한다. local의 기본 버킷
 local 프로필의 endpoint와 인증 정보 기본값은 애플리케이션 실행을 위한 placeholder다. 실제 R2 연결을 확인하려면 local 전용 버킷과 인증 정보를 환경변수로 전달해야 한다. dev와 prod에서는 네 환경변수가 모두 필수다.
 
 R2 API token은 각 환경의 버킷만 읽고 쓸 수 있도록 범위를 제한하며 실제 인증 정보는 저장소에 커밋하지 않는다. 참고: [Cloudflare R2 S3 API](https://developers.cloudflare.com/r2/api/s3/api/)
+
+클라이언트는 발급 요청에 사용한 이미지 `Content-Type` 값을 대소문자까지 그대로 지정해 presigned URL로 PUT해야 한다. 버킷의 public access는 필요하지 않으며, 브라우저에서 직접 업로드한다면 R2 버킷 CORS에서 사용하는 origin, PUT 메서드와 `Content-Type` 헤더를 별도로 허용해야 한다.
 
 ## Docker Compose 배포
 

@@ -82,6 +82,13 @@ enum class OpenApiExample(
             "code" to "A1B2C3",
         ),
     ),
+    PHOTO_UPLOAD_URL_REQUEST(
+        componentName = "PhotoUploadUrlRequestExample",
+        summary = "사진 업로드 URL 발급 요청",
+        value = mapOf(
+            "contentType" to "image/webp",
+        ),
+    ),
     AUTH_RESPONSE(
         componentName = "AuthResponseExample",
         summary = "인증 성공 응답",
@@ -169,6 +176,15 @@ enum class OpenApiExample(
         value = mapOf(
             "groupId" to 10,
             "code" to "A1B2C3",
+        ),
+    ),
+    PHOTO_UPLOAD_URL_RESPONSE(
+        componentName = "PhotoUploadUrlResponseExample",
+        summary = "사진 업로드 URL 발급 성공 응답",
+        value = mapOf(
+            "uploadUrl" to "https://example.r2.cloudflarestorage.com/momogo-dev/dev/users/1/2026-08-03/9f8b3a1c-2d4e-4a6b-8c0d-123456789abc.webp?X-Amz-Signature=example",
+            "objectKey" to "dev/users/1/2026-08-03/9f8b3a1c-2d4e-4a6b-8c0d-123456789abc.webp",
+            "expiresAt" to "2026-08-03T18:15:00",
         ),
     ),
     APP_VERSION_RESPONSE(
