@@ -175,9 +175,9 @@ enum class OpenApiExample(
         componentName = "AppVersionResponseExample",
         summary = "앱 버전 체크 응답",
         value = mapOf(
-            "latestVersion" to "1.3.0",
-            "minSupportedVersion" to "1.1.0",
-            "forceUpdate" to true,
+            "latestVersion" to "1.0.0",
+            "minSupportedVersion" to "1.0.0",
+            "forceUpdate" to false,
             "updateUrl" to "https://apps.apple.com/app/id000000000",
         ),
     ),

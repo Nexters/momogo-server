@@ -71,21 +71,21 @@ class AppVersionController(
 data class AppVersionResponse(
     @field:Schema(
         description = "플랫폼에 배포된 최신 버전",
-        example = "1.3.0",
+        example = "1.0.0",
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val latestVersion: String,
 
     @field:Schema(
         description = "서비스를 이용할 수 있는 최소 버전",
-        example = "1.1.0",
+        example = "1.0.0",
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val minSupportedVersion: String,
 
     @field:Schema(
         description = "강제 업데이트 필요 여부",
-        example = "true",
+        example = "false",
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val forceUpdate: Boolean,

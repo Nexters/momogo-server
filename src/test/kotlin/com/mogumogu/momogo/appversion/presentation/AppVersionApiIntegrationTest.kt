@@ -38,7 +38,7 @@ class AppVersionApiIntegrationTest(
         `when`("현재 버전이 최소 지원 버전보다 낮을 때") {
             val response = checkVersion(
                 platform = "IOS",
-                appVersion = "1.0.9",
+                appVersion = "0.9.9",
             )
             val body = objectMapper.readTree(response.contentAsString)
 
@@ -51,8 +51,8 @@ class AppVersionApiIntegrationTest(
                     "forceUpdate",
                     "updateUrl",
                 )
-                body["latestVersion"].stringValue() shouldBe "1.3.0"
-                body["minSupportedVersion"].stringValue() shouldBe "1.1.0"
+                body["latestVersion"].stringValue() shouldBe "1.0.0"
+                body["minSupportedVersion"].stringValue() shouldBe "1.0.0"
                 body["forceUpdate"].booleanValue() shouldBe true
                 body["updateUrl"].stringValue() shouldBe
                     "https://apps.apple.com/app/id000000000"
@@ -61,7 +61,7 @@ class AppVersionApiIntegrationTest(
 
         `when`("현재 버전이 최소 지원 버전과 같거나 높을 때") {
             then("강제 업데이트가 필요하지 않다고 반환한다") {
-                listOf("1.1.0", "1.3.0", "2.0.0").forEach { appVersion ->
+                listOf("1.0.0", "1.1.0", "2.0.0").forEach { appVersion ->
                     val body = objectMapper.readTree(
                         checkVersion("IOS", appVersion).contentAsString,
                     )
@@ -74,13 +74,13 @@ class AppVersionApiIntegrationTest(
 
     given("ANDROID 앱이면") {
         `when`("버전 체크를 요청할 때") {
-            val response = checkVersion("ANDROID", "1.0.9")
+            val response = checkVersion("ANDROID", "0.9.9")
             val body = objectMapper.readTree(response.contentAsString)
 
             then("ANDROID 정책으로 판단하고 Android 스토어 URL을 반환한다") {
                 response.status shouldBe HttpStatus.OK.value()
-                body["latestVersion"].stringValue() shouldBe "1.3.0"
-                body["minSupportedVersion"].stringValue() shouldBe "1.1.0"
+                body["latestVersion"].stringValue() shouldBe "1.0.0"
+                body["minSupportedVersion"].stringValue() shouldBe "1.0.0"
                 body["forceUpdate"].booleanValue() shouldBe true
                 body["updateUrl"].stringValue() shouldBe
                     "https://play.google.com/store/apps/details?id=com.mogumogu.momogo"
