@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import tools.jackson.databind.ObjectMapper
 import java.time.Instant
@@ -101,6 +102,29 @@ class GroupApiIntegrationTest(
         name: String,
     ): MockHttpServletResponse =
         createGroupWithContent(accessToken, json(mapOf("name" to name)))
+
+    fun updateGroupNameWithContent(
+        accessToken: String?,
+        groupId: Long,
+        content: String,
+    ): MockHttpServletResponse {
+        val request = patch("/api/v1/groups/{groupId}", groupId)
+        if (accessToken != null) {
+            request.header("Authorization", "Bearer $accessToken")
+        }
+        return performJson(request, content)
+    }
+
+    fun updateGroupName(
+        accessToken: String?,
+        groupId: Long,
+        name: String,
+    ): MockHttpServletResponse =
+        updateGroupNameWithContent(
+            accessToken = accessToken,
+            groupId = groupId,
+            content = json(mapOf("name" to name)),
+        )
 
     fun withdraw(accessToken: String): MockHttpServletResponse =
         mockMvc.perform(
@@ -233,6 +257,146 @@ class GroupApiIntegrationTest(
                 }
                 groupRepository.count() shouldBe 0L
                 groupMemberRepository.count() shouldBe 0L
+            }
+        }
+    }
+
+    given("현재 가입 중인 그룹 멤버가 있으면") {
+        `when`("그룹명을 변경할 때") {
+            then("변경된 그룹 정보를 반환하고 데이터베이스에 반영한다") {
+                cleanDatabase()
+                val registeredUser = registerUser("update-group-name-member")
+                val group = saveGroup(
+                    name = "기존 그룹",
+                    code = "UPDATE",
+                )
+                saveMember(group, registeredUser.user)
+
+                val response = updateGroupName(
+                    accessToken = registeredUser.accessToken,
+                    groupId = requireNotNull(group.id),
+                    name = "우리 가족 하우스",
+                )
+
+                response.status shouldBe HttpStatus.OK.value()
+                response.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
+                val body = objectMapper.readTree(response.contentAsString)
+                body.propertyNames().toSet() shouldBe setOf("groupId", "groupName")
+                body["groupId"].longValue() shouldBe group.id
+                body["groupName"].stringValue() shouldBe "우리 가족 하우스"
+                groupRepository.findById(requireNotNull(group.id)).orElseThrow().name shouldBe
+                    "우리 가족 하우스"
+            }
+        }
+    }
+
+    given("현재 그룹에 가입하지 않은 사용자와 탈퇴한 멤버가 있으면") {
+        `when`("그룹명 변경을 요청할 때") {
+            then("403을 반환하고 그룹명을 변경하지 않는다") {
+                cleanDatabase()
+                val nonMember = registerUser("update-group-name-non-member")
+                val leftMember = registerUser("update-group-name-left-member")
+                val group = saveGroup(
+                    name = "변경 전 그룹",
+                    code = "FORBID",
+                )
+                saveMember(
+                    group = group,
+                    user = leftMember.user,
+                    deletedAt = Instant.parse("2030-01-01T00:00:00Z"),
+                )
+
+                listOf(
+                    updateGroupName(
+                        accessToken = nonMember.accessToken,
+                        groupId = requireNotNull(group.id),
+                        name = "비멤버가 변경한 이름",
+                    ),
+                    updateGroupName(
+                        accessToken = leftMember.accessToken,
+                        groupId = requireNotNull(group.id),
+                        name = "탈퇴 멤버가 변경한 이름",
+                    ),
+                ).forEach { response ->
+                    assertProblem(
+                        response = response,
+                        status = HttpStatus.FORBIDDEN,
+                        detail = "그룹 멤버가 아닙니다.",
+                    )
+                }
+                groupRepository.findById(requireNotNull(group.id)).orElseThrow().name shouldBe
+                    "변경 전 그룹"
+            }
+        }
+    }
+
+    given("존재하지 않는 그룹 ID가 있으면") {
+        `when`("그룹명 변경을 요청할 때") {
+            then("404를 반환한다") {
+                cleanDatabase()
+                val registeredUser = registerUser("update-missing-group")
+
+                assertProblem(
+                    response = updateGroupName(
+                        accessToken = registeredUser.accessToken,
+                        groupId = Long.MAX_VALUE,
+                        name = "찾을 수 없는 그룹",
+                    ),
+                    status = HttpStatus.NOT_FOUND,
+                    detail = "그룹을 찾을 수 없습니다.",
+                )
+            }
+        }
+    }
+
+    given("유효하지 않은 변경 그룹명이 있으면") {
+        `when`("공백, 누락 또는 255자를 초과한 이름으로 그룹명 변경을 요청할 때") {
+            then("400을 반환하고 기존 그룹명을 유지한다") {
+                cleanDatabase()
+                val registeredUser = registerUser("invalid-update-group-name")
+                val group = saveGroup(
+                    name = "유지할 그룹명",
+                    code = "INVALD",
+                )
+                saveMember(group, registeredUser.user)
+                val groupId = requireNotNull(group.id)
+
+                listOf(
+                    updateGroupName(registeredUser.accessToken, groupId, "   "),
+                    updateGroupName(registeredUser.accessToken, groupId, "가".repeat(256)),
+                    updateGroupNameWithContent(registeredUser.accessToken, groupId, "{}"),
+                ).forEach { response ->
+                    assertProblem(
+                        response = response,
+                        status = HttpStatus.BAD_REQUEST,
+                        detail = "요청 값이 올바르지 않습니다.",
+                    )
+                }
+                groupRepository.findById(groupId).orElseThrow().name shouldBe "유지할 그룹명"
+            }
+        }
+    }
+
+    given("그룹명 변경 요청에 인증 정보가 없으면") {
+        `when`("그룹명 변경을 요청할 때") {
+            then("401을 반환한다") {
+                cleanDatabase()
+                val group = saveGroup(
+                    name = "인증 필요 그룹",
+                    code = "AUTH01",
+                )
+
+                assertProblem(
+                    response = updateGroupName(
+                        accessToken = null,
+                        groupId = requireNotNull(group.id),
+                        name = "변경할 수 없는 그룹",
+                    ),
+                    status = HttpStatus.UNAUTHORIZED,
+                    detail = "인증 정보가 올바르지 않습니다.",
+                )
+                groupRepository.findById(requireNotNull(group.id)).orElseThrow().name shouldBe
+                    "인증 필요 그룹"
             }
         }
     }

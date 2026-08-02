@@ -27,6 +27,12 @@ enum class ErrorCode(
     GROUP_FULL(
         message = "그룹의 최대 인원을 초과했습니다.",
     ),
+    GROUP_NOT_FOUND(
+        message = "그룹을 찾을 수 없습니다.",
+    ),
+    NOT_GROUP_MEMBER(
+        message = "그룹 멤버가 아닙니다.",
+    ),
     DUPLICATE_LOGIN_ACCOUNT(
         message = "이미 등록된 로그인 계정입니다.",
     ),
