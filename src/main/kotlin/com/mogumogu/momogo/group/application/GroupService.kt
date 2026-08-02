@@ -7,19 +7,67 @@ import com.mogumogu.momogo.group.domain.GroupMember
 import com.mogumogu.momogo.group.domain.InviteCode
 import com.mogumogu.momogo.group.infra.GroupMemberRepository
 import com.mogumogu.momogo.group.infra.GroupRepository
+import com.mogumogu.momogo.photo.infra.PhotoGroupRepository
 import com.mogumogu.momogo.user.infra.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
+import java.time.LocalDate
 
 @Service
 class GroupService(
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val photoGroupRepository: PhotoGroupRepository,
     private val userRepository: UserRepository,
     private val inviteCodeGenerator: InviteCodeGenerator,
     private val clock: Clock,
 ) {
+
+    @Transactional(readOnly = true)
+    fun getJoinedGroups(userId: Long): GetJoinedGroupsResult {
+        if (!userRepository.existsById(userId)) {
+            throw ApiException.NotFound(ErrorCode.USER_NOT_FOUND)
+        }
+
+        val memberships = groupMemberRepository.findAllJoinedWithActiveGroupByUserId(userId)
+        val date = LocalDate.now(clock)
+        if (memberships.isEmpty()) {
+            return GetJoinedGroupsResult(
+                date = date,
+                groups = emptyList(),
+            )
+        }
+
+        val groupIds = memberships.map { membership ->
+            checkNotNull(membership.group.id) { "저장된 그룹 ID가 없습니다." }
+        }
+        val memberCountByGroupId = groupMemberRepository.countJoinedByGroupIds(groupIds)
+            .associate { count -> count.groupId to count.totalMemberCount }
+        val startAt = date.atStartOfDay(clock.zone).toInstant()
+        val endAt = date.plusDays(1).atStartOfDay(clock.zone).toInstant()
+        val photoUploaderCountByGroupId = photoGroupRepository.countTodayPhotoUploadersByGroupIds(
+            groupIds = groupIds,
+            startAt = startAt,
+            endAt = endAt,
+        ).associate { count -> count.groupId to count.uploaderCount }
+
+        return GetJoinedGroupsResult(
+            date = date,
+            groups = memberships.mapNotNull { membership ->
+                val group = membership.group
+                val groupId = checkNotNull(group.id) { "저장된 그룹 ID가 없습니다." }
+                val totalMemberCount = memberCountByGroupId[groupId]
+                    ?: return@mapNotNull null
+                JoinedGroupResult(
+                    groupId = groupId,
+                    groupName = group.name,
+                    totalMemberCount = totalMemberCount,
+                    todayPhotoUploaderCount = photoUploaderCountByGroupId[groupId] ?: 0L,
+                )
+            },
+        )
+    }
 
     @Transactional
     fun create(command: CreateGroupCommand): CreateGroupResult {
@@ -175,6 +223,18 @@ class GroupService(
         }
     }
 }
+
+data class GetJoinedGroupsResult(
+    val date: LocalDate,
+    val groups: List<JoinedGroupResult>,
+)
+
+data class JoinedGroupResult(
+    val groupId: Long,
+    val groupName: String,
+    val totalMemberCount: Long,
+    val todayPhotoUploaderCount: Long,
+)
 
 data class CreateGroupCommand(
     val userId: Long,

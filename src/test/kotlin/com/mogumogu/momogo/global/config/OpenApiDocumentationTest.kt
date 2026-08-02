@@ -56,6 +56,7 @@ class OpenApiDocumentationTest(
                 document.operation("/api/v1/user/me", "get").requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/user", "patch").requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/user", "delete").requiresBearerAuth() shouldBe true
+                document.operation("/api/v1/groups", "get").requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/groups", "post").requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/groups/{groupId}", "patch")
                     .requiresBearerAuth() shouldBe true
@@ -82,6 +83,8 @@ class OpenApiDocumentationTest(
                     .stringValue() shouldBe commonResponseRef
                 document.operation("/api/v1/user", "delete")["responses"]["401"]["\$ref"]
                     .stringValue() shouldBe commonResponseRef
+                document.operation("/api/v1/groups", "get")["responses"]["401"]["\$ref"]
+                    .stringValue() shouldBe commonResponseRef
                 document.operation("/api/v1/groups", "post")["responses"]["401"]["\$ref"]
                     .stringValue() shouldBe commonResponseRef
                 document.operation("/api/v1/groups/{groupId}", "patch")["responses"]["401"]["\$ref"]
@@ -107,6 +110,7 @@ class OpenApiDocumentationTest(
                 document.operation("/api/v1/user/me", "get").hasParameter("userId") shouldBe false
                 document.operation("/api/v1/user", "patch").hasParameter("userId") shouldBe false
                 document.operation("/api/v1/user", "delete").hasParameter("userId") shouldBe false
+                document.operation("/api/v1/groups", "get").hasParameter("userId") shouldBe false
                 document.operation("/api/v1/groups", "post").hasParameter("userId") shouldBe false
                 val updateGroupName = document.operation("/api/v1/groups/{groupId}", "patch")
                 updateGroupName.hasParameter("userId") shouldBe false
@@ -127,6 +131,7 @@ class OpenApiDocumentationTest(
                 val getMe = document.operation("/api/v1/user/me", "get")
                 val updateNickname = document.operation("/api/v1/user", "patch")
                 val withdraw = document.operation("/api/v1/user", "delete")
+                val getJoinedGroups = document.operation("/api/v1/groups", "get")
                 val createGroup = document.operation("/api/v1/groups", "post")
                 val updateGroupName = document.operation("/api/v1/groups/{groupId}", "patch")
                 val invitationInfo = document.operation("/api/v1/groups/invitations", "get")
@@ -156,6 +161,10 @@ class OpenApiDocumentationTest(
                 updateNickname.responseCodes() shouldBe setOf("200", "400", "401", "404")
                 withdraw["summary"].stringValue() shouldBe "회원 탈퇴"
                 withdraw.responseCodes() shouldBe setOf("200", "401", "404")
+                getJoinedGroups["summary"].stringValue() shouldBe "내가 참여한 그룹 조회"
+                getJoinedGroups.responseCodes() shouldBe setOf("200", "401", "404")
+                getJoinedGroups.hasResponseMediaType("200", "application/json") shouldBe true
+                getJoinedGroups.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 createGroup["summary"].stringValue() shouldBe "그룹 생성"
                 createGroup.responseCodes() shouldBe setOf("200", "400", "401", "404")
                 createGroup.hasResponseMediaType("200", "application/json") shouldBe true
@@ -211,6 +220,29 @@ class OpenApiDocumentationTest(
                     setOf("name")
                 schemas["CreateGroupResponse"]["required"].stringValues().toSet() shouldBe
                     setOf("groupId", "groupName", "inviteCode")
+
+                val getJoinedGroups = document.operation("/api/v1/groups", "get")
+                val getJoinedGroupsSchema = document.responseSchema(getJoinedGroups, "200")
+                getJoinedGroupsSchema["required"].stringValues().toSet() shouldBe
+                    setOf("date", "groups")
+                getJoinedGroupsSchema["properties"]["date"]["type"].stringValue() shouldBe "string"
+                getJoinedGroupsSchema["properties"]["date"]["format"].stringValue() shouldBe "date"
+                getJoinedGroupsSchema["properties"]["groups"]["type"].stringValue() shouldBe "array"
+                val joinedGroupSchemaRef =
+                    getJoinedGroupsSchema["properties"]["groups"]["items"]["\$ref"].stringValue()
+                val joinedGroupSchema = schemas[joinedGroupSchemaRef.substringAfterLast('/')]
+                joinedGroupSchema["required"].stringValues().toSet() shouldBe setOf(
+                    "groupId",
+                    "groupName",
+                    "totalMemberCount",
+                    "todayPhotoUploaderCount",
+                )
+                joinedGroupSchema["properties"].propertyNames().asSequence().toSet() shouldBe setOf(
+                    "groupId",
+                    "groupName",
+                    "totalMemberCount",
+                    "todayPhotoUploaderCount",
+                )
                 schemas["UpdateGroupRequest"]["properties"]["name"]["maxLength"]
                     .intValue() shouldBe 255
                 schemas["UpdateGroupRequest"]["required"].stringValues().toSet() shouldBe
