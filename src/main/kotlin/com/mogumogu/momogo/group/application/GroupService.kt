@@ -38,6 +38,31 @@ class GroupService(
         )
     }
 
+    @Transactional
+    fun update(command: UpdateGroupCommand): UpdateGroupResult {
+        val group = groupRepository.findById(command.groupId)
+            .orElseThrow { ApiException.NotFound(ErrorCode.GROUP_NOT_FOUND) }
+        val membership = groupMemberRepository.findByGroupIdAndUserId(
+            groupId = command.groupId,
+            userId = command.userId,
+        )
+
+        if (membership?.isJoined() != true) {
+            throw ApiException.Forbidden(ErrorCode.NOT_GROUP_MEMBER)
+        }
+
+        try {
+            group.updateName(command.name)
+        } catch (_: IllegalArgumentException) {
+            throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
+        }
+
+        return UpdateGroupResult(
+            groupId = checkNotNull(group.id) { "저장된 그룹 ID가 없습니다." },
+            name = group.name,
+        )
+    }
+
     @Transactional(readOnly = true)
     fun getInvitation(command: GetGroupInvitationCommand): GroupInvitationResult {
         val group = findGroupByInviteCode(command.code)
@@ -141,6 +166,17 @@ data class CreateGroupResult(
     val groupId: Long,
     val name: String,
     val inviteCode: String,
+)
+
+data class UpdateGroupCommand(
+    val userId: Long,
+    val groupId: Long,
+    val name: String,
+)
+
+data class UpdateGroupResult(
+    val groupId: Long,
+    val name: String,
 )
 
 data class GetGroupInvitationCommand(

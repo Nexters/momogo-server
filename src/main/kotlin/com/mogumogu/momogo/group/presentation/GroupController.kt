@@ -6,6 +6,7 @@ import com.mogumogu.momogo.group.application.CreateGroupCommand
 import com.mogumogu.momogo.group.application.GetGroupInvitationCommand
 import com.mogumogu.momogo.group.application.GroupService
 import com.mogumogu.momogo.group.application.JoinGroupCommand
+import com.mogumogu.momogo.group.application.UpdateGroupCommand
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -18,6 +19,8 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -92,6 +95,79 @@ class GroupController(
             groupId = result.groupId,
             groupName = result.name,
             inviteCode = result.inviteCode,
+        )
+    }
+
+    @Operation(
+        summary = "그룹명 변경",
+        description = "현재 가입 중인 그룹 멤버가 그룹명을 변경합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "그룹명 변경 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = UpdateGroupResponse::class),
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "그룹명이 비어 있거나 255자를 초과함",
+                content = [
+                    Content(
+                        mediaType = "application/problem+json",
+                        schema = Schema(implementation = ProblemDetail::class),
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "현재 가입 중인 그룹 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = "application/problem+json",
+                        schema = Schema(implementation = ProblemDetail::class),
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "그룹을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = "application/problem+json",
+                        schema = Schema(implementation = ProblemDetail::class),
+                    ),
+                ],
+            ),
+        ],
+    )
+    @PatchMapping("/{groupId}")
+    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
+    fun update(
+        @RequestUserId
+        userId: Long,
+        @PathVariable
+        groupId: Long,
+        @Valid
+        @RequestBody
+        request: UpdateGroupRequest,
+    ): UpdateGroupResponse {
+        val result = groupService.update(
+            UpdateGroupCommand(
+                userId = userId,
+                groupId = groupId,
+                name = request.name,
+            ),
+        )
+
+        return UpdateGroupResponse(
+            groupId = result.groupId,
+            groupName = result.name,
         )
     }
 
@@ -242,6 +318,36 @@ data class CreateGroupResponse(
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val inviteCode: String,
+)
+
+@Schema(description = "그룹 수정 요청")
+data class UpdateGroupRequest(
+    @field:NotBlank(message = "name은 비어 있을 수 없습니다.")
+    @field:Size(max = 255, message = "name은 255자를 초과할 수 없습니다.")
+    @field:Schema(
+        description = "변경할 그룹명",
+        example = "우리 가족 하우스",
+        maxLength = 255,
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val name: String,
+)
+
+@Schema(description = "그룹 수정 응답")
+data class UpdateGroupResponse(
+    @field:Schema(
+        description = "그룹 ID",
+        example = "10",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val groupId: Long,
+
+    @field:Schema(
+        description = "변경된 그룹명",
+        example = "우리 가족 하우스",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val groupName: String,
 )
 
 @Schema(description = "초대 코드로 확인한 그룹 정보")
