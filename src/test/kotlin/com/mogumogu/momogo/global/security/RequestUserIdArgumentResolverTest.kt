@@ -1,6 +1,7 @@
 package com.mogumogu.momogo.global.security
 
 import com.mogumogu.momogo.global.error.ApiException
+import com.mogumogu.momogo.global.error.ErrorCode
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
@@ -36,9 +37,12 @@ class RequestUserIdArgumentResolverTest : BehaviorSpec({
 
         `when`("인증 정보가 없을 때") {
             then("401 API 예외를 발생시킨다") {
-                shouldThrow<ApiException.Unauthorized> {
+                val exception = shouldThrow<ApiException.Unauthorized> {
                     resolver.resolveArgument(parameter, null, webRequest, null)
-                }.statusCode.value() shouldBe 401
+                }
+
+                exception.errorCode shouldBe ErrorCode.INVALID_AUTH_CREDENTIALS
+                exception.statusCode.value() shouldBe 401
             }
         }
 
@@ -47,9 +51,12 @@ class RequestUserIdArgumentResolverTest : BehaviorSpec({
                 JwtAuthenticationToken(jwt(subject = "not-a-long"), emptyList())
 
             then("401 API 예외를 발생시킨다") {
-                shouldThrow<ApiException.Unauthorized> {
+                val exception = shouldThrow<ApiException.Unauthorized> {
                     resolver.resolveArgument(parameter, null, webRequest, null)
-                }.statusCode.value() shouldBe 401
+                }
+
+                exception.errorCode shouldBe ErrorCode.INVALID_AUTH_CREDENTIALS
+                exception.statusCode.value() shouldBe 401
             }
         }
     }

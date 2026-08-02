@@ -1,5 +1,7 @@
 package com.mogumogu.momogo.global.config
 
+import com.mogumogu.momogo.global.error.ErrorCode
+import com.mogumogu.momogo.global.openapi.OpenApiExample
 import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.extensions.spring.SpringExtension
@@ -104,6 +106,16 @@ class OpenApiDocumentationTest(
                 commonResponse["description"].stringValue() shouldBe
                     "액세스 토큰이 없거나 유효하지 않음"
                 commonResponse["content"].has("application/problem+json") shouldBe true
+                val unauthorizedContent = commonResponse["content"]["application/problem+json"]
+                unauthorizedContent["schema"]["\$ref"].stringValue() shouldBe
+                    "#/components/schemas/ProblemDetail"
+                unauthorizedContent["examples"].propertyNames().asSequence().toSet() shouldBe
+                    setOf(ErrorCode.INVALID_AUTH_CREDENTIALS.name)
+                unauthorizedContent["examples"][ErrorCode.INVALID_AUTH_CREDENTIALS.name]
+                    .shouldBeProblemExample(
+                        errorCode = ErrorCode.INVALID_AUTH_CREDENTIALS,
+                        status = HttpStatus.UNAUTHORIZED,
+                    )
             }
 
             then("서버가 주입하는 userId를 요청 파라미터로 노출하지 않는다") {
@@ -190,6 +202,70 @@ class OpenApiDocumentationTest(
                 checkAppVersion.responseCodes() shouldBe setOf("200", "400")
                 checkAppVersion.hasResponseMediaType("200", "application/json") shouldBe true
                 checkAppVersion.hasResponseMediaType("400", "application/problem+json") shouldBe true
+            }
+
+            then("재사용 가능한 요청과 성공 응답 예시를 components에 제공한다") {
+                val examples = document["components"]["examples"]
+
+                OpenApiExample.entries
+                    .filterNot { example -> example == OpenApiExample.NONE }
+                    .forEach { example ->
+                        val componentExample = examples[example.componentName]
+                        componentExample["summary"].stringValue() shouldBe example.summary
+                        componentExample["value"] shouldBe
+                            objectMapper.valueToTree<JsonNode>(example.value)
+                    }
+            }
+
+            then("각 API에 구체적인 요청과 성공 응답 예시를 연결한다") {
+                operationExampleExpectations.forEach { expectation ->
+                    val operation = document.operation(expectation.path, expectation.method)
+
+                    if (expectation.request != OpenApiExample.NONE) {
+                        operation.requestExampleRef(expectation.request) shouldBe
+                            expectation.request.componentRef()
+                        operation.requestSchemaRef() shouldBe
+                            expectation.requestSchema.componentSchemaRef()
+                    }
+                    operation.successExampleRef(expectation.success) shouldBe
+                        expectation.success.componentRef()
+                    if (expectation.successSchema == null) {
+                        operation.successSchema()["type"].stringValue() shouldBe "object"
+                    } else {
+                        operation.successSchemaRef() shouldBe
+                            expectation.successSchema.componentSchemaRef()
+                    }
+                }
+
+                val invitationInfo = document.operation("/api/v1/groups/invitations", "get")
+                invitationInfo.parameter("code")["example"].stringValue() shouldBe "A1B2C3"
+
+                val appVersion = document.operation("/init/versions", "get")
+                appVersion.parameter("platform")["example"].stringValue() shouldBe "IOS"
+                appVersion.parameter("appVersion")["example"].stringValue() shouldBe "1.0.0"
+            }
+
+            then("실제 발생 가능한 오류를 상태별 named example로 제공한다") {
+                document["components"]["schemas"].has("ProblemDetail") shouldBe true
+
+                errorResponseExpectations.forEach { expectation ->
+                    val operation = document.operation(expectation.path, expectation.method)
+                    val content =
+                        operation["responses"][expectation.responseCode]["content"]
+                            .get("application/problem+json")
+
+                    content["schema"]["\$ref"].stringValue() shouldBe
+                        "#/components/schemas/ProblemDetail"
+                    content["examples"].propertyNames().asSequence().toSet() shouldBe
+                        expectation.errors.map { errorCode -> errorCode.name }.toSet()
+
+                    expectation.errors.forEach { errorCode ->
+                        content["examples"][errorCode.name].shouldBeProblemExample(
+                            errorCode = errorCode,
+                            status = HttpStatus.valueOf(expectation.responseCode.toInt()),
+                        )
+                    }
+                }
             }
 
             then("요청 스키마에 현재 지원 범위와 입력 제한을 표시한다") {
@@ -294,6 +370,260 @@ class OpenApiDocumentationTest(
     }
 })
 
+private data class OperationExampleExpectation(
+    val path: String,
+    val method: String,
+    val success: OpenApiExample,
+    val successSchema: String?,
+    val request: OpenApiExample = OpenApiExample.NONE,
+    val requestSchema: String? = null,
+)
+
+private val operationExampleExpectations = listOf(
+    OperationExampleExpectation(
+        path = "/api/v1/user/register",
+        method = "post",
+        request = OpenApiExample.REGISTER_REQUEST,
+        requestSchema = "RegisterRequest",
+        success = OpenApiExample.AUTH_RESPONSE,
+        successSchema = "AuthResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/auth/login",
+        method = "post",
+        request = OpenApiExample.LOGIN_REQUEST,
+        requestSchema = "LoginRequest",
+        success = OpenApiExample.AUTH_RESPONSE,
+        successSchema = "AuthResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/auth/reissue",
+        method = "post",
+        request = OpenApiExample.REFRESH_TOKEN_REQUEST,
+        requestSchema = "RefreshTokenRequest",
+        success = OpenApiExample.REISSUE_RESPONSE,
+        successSchema = "ReissueResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/auth/logout",
+        method = "delete",
+        request = OpenApiExample.REFRESH_TOKEN_REQUEST,
+        requestSchema = "RefreshTokenRequest",
+        success = OpenApiExample.EMPTY_OBJECT_RESPONSE,
+        successSchema = null,
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/user/me",
+        method = "get",
+        success = OpenApiExample.USER_RESPONSE,
+        successSchema = "UserResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/user",
+        method = "patch",
+        request = OpenApiExample.UPDATE_NICKNAME_REQUEST,
+        requestSchema = "UpdateNicknameRequest",
+        success = OpenApiExample.UPDATED_USER_RESPONSE,
+        successSchema = "UserResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/user",
+        method = "delete",
+        success = OpenApiExample.EMPTY_OBJECT_RESPONSE,
+        successSchema = null,
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/groups",
+        method = "get",
+        success = OpenApiExample.JOINED_GROUPS_RESPONSE,
+        successSchema = "JoinedGroupsResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/groups",
+        method = "post",
+        request = OpenApiExample.CREATE_GROUP_REQUEST,
+        requestSchema = "CreateGroupRequest",
+        success = OpenApiExample.CREATE_GROUP_RESPONSE,
+        successSchema = "CreateGroupResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/groups/{groupId}",
+        method = "patch",
+        request = OpenApiExample.UPDATE_GROUP_REQUEST,
+        requestSchema = "UpdateGroupRequest",
+        success = OpenApiExample.UPDATE_GROUP_RESPONSE,
+        successSchema = "UpdateGroupResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/groups/invitations",
+        method = "get",
+        success = OpenApiExample.GROUP_INVITATION_RESPONSE,
+        successSchema = "GroupInvitationResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/groups/invitations",
+        method = "post",
+        request = OpenApiExample.JOIN_GROUP_REQUEST,
+        requestSchema = "JoinGroupRequest",
+        success = OpenApiExample.JOIN_GROUP_RESPONSE,
+        successSchema = "JoinGroupResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/groups/{groupId}/members/me",
+        method = "delete",
+        success = OpenApiExample.EMPTY_OBJECT_RESPONSE,
+        successSchema = null,
+    ),
+    OperationExampleExpectation(
+        path = "/init/versions",
+        method = "get",
+        success = OpenApiExample.APP_VERSION_RESPONSE,
+        successSchema = "AppVersionResponse",
+    ),
+)
+
+private data class ErrorResponseExpectation(
+    val path: String,
+    val method: String,
+    val responseCode: String,
+    val errors: Set<ErrorCode>,
+)
+
+private val errorResponseExpectations = listOf(
+    ErrorResponseExpectation(
+        "/api/v1/user/register",
+        "post",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST, ErrorCode.UNSUPPORTED_PROVIDER),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/user/register",
+        "post",
+        "409",
+        setOf(ErrorCode.DUPLICATE_LOGIN_ACCOUNT),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/auth/login",
+        "post",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST, ErrorCode.UNSUPPORTED_PROVIDER),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/auth/login",
+        "post",
+        "401",
+        setOf(ErrorCode.INVALID_AUTH_CREDENTIALS),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/auth/reissue",
+        "post",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/auth/reissue",
+        "post",
+        "401",
+        setOf(ErrorCode.INVALID_REFRESH_TOKEN),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/auth/logout",
+        "delete",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/user/me",
+        "get",
+        "404",
+        setOf(ErrorCode.USER_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/user",
+        "patch",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/user",
+        "patch",
+        "404",
+        setOf(ErrorCode.USER_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/user",
+        "delete",
+        "404",
+        setOf(ErrorCode.USER_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups",
+        "get",
+        "404",
+        setOf(ErrorCode.USER_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups",
+        "post",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups",
+        "post",
+        "404",
+        setOf(ErrorCode.USER_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}",
+        "patch",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}",
+        "patch",
+        "403",
+        setOf(ErrorCode.NOT_GROUP_MEMBER),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}",
+        "patch",
+        "404",
+        setOf(ErrorCode.GROUP_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/invitations",
+        "get",
+        "404",
+        setOf(ErrorCode.INVALID_INVITATION_CODE),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/invitations",
+        "post",
+        "404",
+        setOf(ErrorCode.USER_NOT_FOUND, ErrorCode.INVALID_INVITATION_CODE),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/invitations",
+        "post",
+        "409",
+        setOf(ErrorCode.ALREADY_JOINED, ErrorCode.GROUP_FULL),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/members/me",
+        "delete",
+        "404",
+        setOf(ErrorCode.GROUP_NOT_FOUND, ErrorCode.MEMBER_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/init/versions",
+        "get",
+        "400",
+        setOf(ErrorCode.INVALID_PLATFORM, ErrorCode.INVALID_REQUEST),
+    ),
+)
+
 private fun JsonNode.operation(
     path: String,
     method: String,
@@ -308,6 +638,34 @@ private fun JsonNode.hasParameter(name: String): Boolean =
     this["parameters"]
         ?.any { parameter -> parameter["name"]?.stringValue() == name }
         ?: false
+
+private fun JsonNode.parameter(name: String): JsonNode =
+    this["parameters"].first { parameter -> parameter["name"].stringValue() == name }
+
+private fun JsonNode.requestExampleRef(example: OpenApiExample): String =
+    this["requestBody"]["content"]["application/json"]["examples"]
+        .get(example.componentName)["\$ref"].stringValue()
+
+private fun JsonNode.successExampleRef(example: OpenApiExample): String =
+    this["responses"]["200"]["content"]["application/json"]["examples"]
+        .get(example.componentName)["\$ref"].stringValue()
+
+private fun JsonNode.requestSchemaRef(): String =
+    this["requestBody"]["content"]["application/json"]["schema"]["\$ref"].stringValue()
+
+private fun JsonNode.successSchema(): JsonNode =
+    this["responses"]["200"]["content"]["application/json"]["schema"]
+
+private fun JsonNode.successSchemaRef(): String =
+    successSchema()["\$ref"].stringValue()
+
+private fun OpenApiExample.componentRef(): String =
+    "#/components/examples/$componentName"
+
+private fun String?.componentSchemaRef(): String {
+    checkNotNull(this)
+    return "#/components/schemas/$this"
+}
 
 private fun JsonNode.responseCodes(): Set<String> =
     this["responses"].propertyNames().asSequence().toSet()
@@ -329,3 +687,19 @@ private fun JsonNode.responseSchema(
 
 private fun JsonNode.stringValues(): List<String> =
     values().map { value -> value.stringValue() }
+
+private fun JsonNode.shouldBeProblemExample(
+    errorCode: ErrorCode,
+    status: HttpStatus,
+) {
+    this["summary"].stringValue() shouldBe errorCode.message
+    this["value"]["type"].stringValue() shouldBe "about:blank"
+    this["value"]["title"].stringValue() shouldBe status.reasonPhrase
+    this["value"]["status"].intValue() shouldBe status.value()
+    this["value"]["detail"].stringValue() shouldBe errorCode.message
+    if (errorCode == ErrorCode.INVALID_PLATFORM) {
+        this["value"]["code"].stringValue() shouldBe errorCode.name
+    } else {
+        this["value"].has("code") shouldBe false
+    }
+}

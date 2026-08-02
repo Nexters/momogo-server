@@ -6,6 +6,7 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -25,26 +26,30 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
         .build()
     val objectMapper = JsonMapper.builder().build()
 
-    given("API 예외 종류가 다르면") {
-        val notFound: ApiException = ApiException.NotFound(ErrorCode.RESOURCE_NOT_FOUND)
-        val badRequest: ApiException = ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
-        val unauthorized: ApiException = ApiException.Unauthorized(ErrorCode.INVALID_AUTH_CREDENTIALS)
-        val forbidden: ApiException = ApiException.Forbidden(ErrorCode.FORBIDDEN)
+    given("상태별 API 예외를 생성하면") {
+        then("sealed 하위 타입의 상태와 ErrorCode의 메시지를 사용한다") {
+            val expectations = listOf(
+                ApiException.BadRequest(ErrorCode.INVALID_REQUEST) to HttpStatus.BAD_REQUEST,
+                ApiException.Unauthorized(ErrorCode.INVALID_AUTH_CREDENTIALS) to
+                    HttpStatus.UNAUTHORIZED,
+                ApiException.Forbidden(ErrorCode.FORBIDDEN) to HttpStatus.FORBIDDEN,
+                ApiException.NotFound(ErrorCode.RESOURCE_NOT_FOUND) to HttpStatus.NOT_FOUND,
+                ApiException.Conflict(ErrorCode.ALREADY_JOINED) to HttpStatus.CONFLICT,
+            )
 
-        then("서로 다른 런타임 타입으로 구분할 수 있다") {
-            (notFound is ApiException.NotFound) shouldBe true
-            (notFound is ApiException.BadRequest) shouldBe false
-            (badRequest is ApiException.BadRequest) shouldBe true
-            (badRequest is ApiException.NotFound) shouldBe false
-            (unauthorized is ApiException.Unauthorized) shouldBe true
-            unauthorized.statusCode.value() shouldBe 401
-            (forbidden is ApiException.Forbidden) shouldBe true
-            forbidden.statusCode.value() shouldBe 403
+            expectations.forEach { (exception, expectedStatus) ->
+                val errorCode = exception.errorCode
+
+                exception.statusCode.value() shouldBe expectedStatus.value()
+                exception.body.status shouldBe expectedStatus.value()
+                exception.body.title shouldBe expectedStatus.reasonPhrase
+                exception.body.detail shouldBe errorCode.message
+            }
         }
     }
 
     given("API 예외가 발생하면") {
-        `when`("notFound 팩토리로 예외를 생성할 때") {
+        `when`("RESOURCE_NOT_FOUND ErrorCode로 예외를 생성할 때") {
             val response = mockMvc.perform(get("/test/api-exception"))
                 .andReturn()
                 .response

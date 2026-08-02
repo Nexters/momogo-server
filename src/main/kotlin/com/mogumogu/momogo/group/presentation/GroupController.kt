@@ -1,6 +1,10 @@
 package com.mogumogu.momogo.group.presentation
 
 import com.mogumogu.momogo.global.config.OpenApiConfiguration
+import com.mogumogu.momogo.global.error.ErrorCode
+import com.mogumogu.momogo.global.openapi.ApiErrors
+import com.mogumogu.momogo.global.openapi.ApiExamples
+import com.mogumogu.momogo.global.openapi.OpenApiExample
 import com.mogumogu.momogo.global.security.RequestUserId
 import com.mogumogu.momogo.group.application.CreateGroupCommand
 import com.mogumogu.momogo.group.application.GetGroupInvitationCommand
@@ -9,16 +13,13 @@ import com.mogumogu.momogo.group.application.JoinGroupCommand
 import com.mogumogu.momogo.group.application.LeaveGroupCommand
 import com.mogumogu.momogo.group.application.UpdateGroupCommand
 import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Schema
-import io.swagger.v3.oas.annotations.responses.ApiResponse
-import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
-import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
@@ -34,6 +35,7 @@ import java.time.LocalDate
     name = "그룹",
     description = "그룹 관리 API",
 )
+@SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
 @RestController
 @RequestMapping("/api/v1/groups")
 class GroupController(
@@ -44,32 +46,9 @@ class GroupController(
         summary = "내가 참여한 그룹 조회",
         description = "현재 사용자가 참여 중인 그룹과 오늘 사진을 올린 그룹 멤버 수를 조회합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "참여 그룹 조회 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(implementation = JoinedGroupsResponse::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "404",
-                description = "사용자를 찾을 수 없음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-        ],
-    )
+    @ApiExamples(success = OpenApiExample.JOINED_GROUPS_RESPONSE)
+    @ApiErrors(notFound = [ErrorCode.USER_NOT_FOUND])
     @GetMapping
-    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
     fun getJoinedGroups(
         @RequestUserId
         userId: Long,
@@ -93,42 +72,15 @@ class GroupController(
         summary = "그룹 생성",
         description = "그룹을 만들고 현재 사용자를 첫 번째 멤버로 등록합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "그룹 생성 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(implementation = CreateGroupResponse::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "400",
-                description = "그룹명이 비어 있거나 255자를 초과함",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "404",
-                description = "사용자를 찾을 수 없음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-        ],
+    @ApiExamples(
+        request = OpenApiExample.CREATE_GROUP_REQUEST,
+        success = OpenApiExample.CREATE_GROUP_RESPONSE,
+    )
+    @ApiErrors(
+        badRequest = [ErrorCode.INVALID_REQUEST],
+        notFound = [ErrorCode.USER_NOT_FOUND],
     )
     @PostMapping
-    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
     fun create(
         @RequestUserId
         userId: Long,
@@ -154,55 +106,20 @@ class GroupController(
         summary = "그룹명 변경",
         description = "현재 가입 중인 그룹 멤버가 그룹명을 변경합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "그룹명 변경 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(implementation = UpdateGroupResponse::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "400",
-                description = "그룹명이 비어 있거나 255자를 초과함",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "403",
-                description = "현재 가입 중인 그룹 멤버가 아님",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "404",
-                description = "그룹을 찾을 수 없음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-        ],
+    @ApiExamples(
+        request = OpenApiExample.UPDATE_GROUP_REQUEST,
+        success = OpenApiExample.UPDATE_GROUP_RESPONSE,
+    )
+    @ApiErrors(
+        badRequest = [ErrorCode.INVALID_REQUEST],
+        forbidden = [ErrorCode.NOT_GROUP_MEMBER],
+        notFound = [ErrorCode.GROUP_NOT_FOUND],
     )
     @PatchMapping("/{groupId}")
-    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
     fun update(
         @RequestUserId
         userId: Long,
+        @Parameter(example = "10")
         @PathVariable
         groupId: Long,
         @Valid
@@ -227,35 +144,13 @@ class GroupController(
         summary = "초대 코드로 그룹 정보 확인",
         description = "그룹에 참여하기 전에 초대 코드에 해당하는 그룹 정보와 현재 참여 여부를 확인합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "그룹 정보 확인 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(implementation = GroupInvitationResponse::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "404",
-                description = "유효하지 않은 초대 코드",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-        ],
-    )
+    @ApiExamples(success = OpenApiExample.GROUP_INVITATION_RESPONSE)
+    @ApiErrors(notFound = [ErrorCode.INVALID_INVITATION_CODE])
     @GetMapping("/invitations")
-    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
     fun getInvitation(
         @RequestUserId
         userId: Long,
+        @Parameter(example = "A1B2C3")
         @RequestParam
         code: String,
     ): GroupInvitationResponse {
@@ -278,42 +173,21 @@ class GroupController(
         summary = "초대 코드로 그룹 참여",
         description = "초대 코드에 해당하는 그룹에 현재 사용자를 멤버로 등록합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "그룹 참여 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(implementation = JoinGroupResponse::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "404",
-                description = "유효하지 않은 초대 코드 또는 사용자를 찾을 수 없음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "409",
-                description = "이미 그룹에 가입했거나 그룹 최대 인원 초과",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
+    @ApiExamples(
+        request = OpenApiExample.JOIN_GROUP_REQUEST,
+        success = OpenApiExample.JOIN_GROUP_RESPONSE,
+    )
+    @ApiErrors(
+        notFound = [
+            ErrorCode.USER_NOT_FOUND,
+            ErrorCode.INVALID_INVITATION_CODE,
+        ],
+        conflict = [
+            ErrorCode.ALREADY_JOINED,
+            ErrorCode.GROUP_FULL,
         ],
     )
     @PostMapping("/invitations")
-    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
     fun join(
         @RequestUserId
         userId: Long,
@@ -337,35 +211,18 @@ class GroupController(
         summary = "그룹 탈퇴",
         description = "현재 사용자를 그룹에서 탈퇴시킵니다. 마지막 멤버가 탈퇴하면 그룹도 삭제합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "그룹 탈퇴 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(type = "object", example = "{}"),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "404",
-                description = "그룹 또는 현재 사용자의 활성 멤버십을 찾을 수 없음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
+    @ApiExamples(success = OpenApiExample.EMPTY_OBJECT_RESPONSE)
+    @ApiErrors(
+        notFound = [
+            ErrorCode.GROUP_NOT_FOUND,
+            ErrorCode.MEMBER_NOT_FOUND,
         ],
     )
     @DeleteMapping("/{groupId}/members/me")
-    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
     fun leave(
         @RequestUserId
         userId: Long,
+        @Parameter(example = "10")
         @PathVariable
         groupId: Long,
     ): Map<String, Any> {
