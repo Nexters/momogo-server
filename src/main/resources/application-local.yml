@@ -37,12 +37,12 @@ momogo:
       secret-access-key: ${R2_SECRET_ACCESS_KEY:local-secret-access-key}
   app-version:
     ios:
-      latest-version: 1.3.0
-      min-supported-version: 1.1.0
+      latest-version: 1.0.0
+      min-supported-version: 1.0.0
       update-url: https://apps.apple.com/app/id000000000
     android:
-      latest-version: 1.3.0
-      min-supported-version: 1.1.0
+      latest-version: 1.0.0
+      min-supported-version: 1.0.0
       update-url: https://play.google.com/store/apps/details?id=com.mogumogu.momogo
 
 springdoc:

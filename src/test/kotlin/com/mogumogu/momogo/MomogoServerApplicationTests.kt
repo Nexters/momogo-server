@@ -51,6 +51,15 @@ class MomogoServerApplicationTests(
         }
     }
 
+    given("애플리케이션 기본 타임존을 설정하면") {
+        configureApplicationTimeZone()
+
+        then("JVM 전체에서 한국 시간대를 사용한다") {
+            System.getProperty("user.timezone") shouldBe APPLICATION_TIME_ZONE_ID
+            ZoneId.systemDefault() shouldBe ZoneId.of(APPLICATION_TIME_ZONE_ID)
+        }
+    }
+
     given("기본 test 프로필에서 Swagger 문서가 비활성화된 상태에서") {
         `when`("OpenAPI 문서를 요청하면") {
             val response = mockMvc.perform(get("/v3/api-docs"))
