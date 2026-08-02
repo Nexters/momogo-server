@@ -61,9 +61,9 @@ class GroupMember(
         }
     }
 
-    fun ensureCanBeReplaced() {
-        check(!isActive()) { "활성 멤버십은 새 멤버십으로 교체할 수 없습니다." }
+    fun ensureCanJoin() {
+        check(!isJoined()) { "이미 그룹에 가입되어 있습니다." }
     }
 
-    fun isActive(): Boolean = _deletedAt == null
+    fun isJoined(): Boolean = _deletedAt == null
 }

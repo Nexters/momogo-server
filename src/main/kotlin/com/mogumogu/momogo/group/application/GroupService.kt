@@ -50,8 +50,8 @@ class GroupService(
         return GroupInvitationResult(
             groupId = groupId,
             groupName = group.name,
-            totalMemberCount = groupMemberRepository.countActiveByGroupId(groupId),
-            participated = membership?.isActive() == true,
+            totalMemberCount = groupMemberRepository.countJoinedByGroupId(groupId),
+            participated = membership?.isJoined() == true,
         )
     }
 
@@ -68,14 +68,14 @@ class GroupService(
         )
 
         try {
-            membership?.ensureCanBeReplaced()
+            membership?.ensureCanJoin()
         } catch (_: IllegalStateException) {
             throw ApiException.Conflict(ErrorCode.ALREADY_JOINED)
         }
 
         ensureGroupCanJoin(
             group = group,
-            activeMemberCount = groupMemberRepository.countActiveByGroupId(groupId),
+            joinedMemberCount = groupMemberRepository.countJoinedByGroupId(groupId),
         )
 
         if (membership != null) {
@@ -122,10 +122,10 @@ class GroupService(
 
     private fun ensureGroupCanJoin(
         group: Group,
-        activeMemberCount: Long,
+        joinedMemberCount: Long,
     ) {
         try {
-            group.ensureCanJoin(activeMemberCount)
+            group.ensureCanJoin(joinedMemberCount)
         } catch (_: IllegalStateException) {
             throw ApiException.Conflict(ErrorCode.GROUP_FULL)
         }

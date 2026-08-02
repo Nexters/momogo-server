@@ -48,9 +48,9 @@ class Group(
         _inviteCode = inviteCode
     }
 
-    fun ensureCanJoin(activeMemberCount: Long) {
-        require(activeMemberCount >= 0) { "활성 멤버 수는 0명 이상이어야 합니다." }
-        check(activeMemberCount < MAX_MEMBER_COUNT) {
+    fun ensureCanJoin(joinedMemberCount: Long) {
+        require(joinedMemberCount >= 0) { "가입 인원은 0명 이상이어야 합니다." }
+        check(joinedMemberCount < MAX_MEMBER_COUNT) {
             "그룹은 최대 ${MAX_MEMBER_COUNT}명까지 가입할 수 있습니다."
         }
     }

@@ -174,7 +174,7 @@ class GroupController(
             ),
             ApiResponse(
                 responseCode = "409",
-                description = "이미 가입한 그룹 또는 그룹 최대 인원 초과",
+                description = "이미 그룹에 가입했거나 그룹 최대 인원 초과",
                 content = [
                     Content(
                         mediaType = "application/problem+json",

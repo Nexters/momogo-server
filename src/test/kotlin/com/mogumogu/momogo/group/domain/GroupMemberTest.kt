@@ -11,7 +11,7 @@ class GroupMemberTest : BehaviorSpec({
 
     given("그룹에 가입한 회원이 있으면") {
         `when`("그룹 멤버십을 생성할 때") {
-            then("그룹과 회원 정보를 조회할 수 있고 활성 상태다") {
+            then("그룹과 회원 정보를 조회할 수 있고 가입 상태다") {
                 val group = createGroupForMember()
                 val user = User(_nickname = "모고")
                 val groupMember = GroupMember(
@@ -24,29 +24,29 @@ class GroupMemberTest : BehaviorSpec({
                 groupMember.group shouldBe group
                 groupMember.user shouldBe user
                 groupMember.deletedAt shouldBe null
-                groupMember.isActive() shouldBe true
+                groupMember.isJoined() shouldBe true
             }
         }
 
         `when`("그룹에서 나갈 때") {
-            then("탈퇴 시각을 기록하고 비활성 상태가 된다") {
+            then("탈퇴 시각을 기록하고 탈퇴 상태가 된다") {
                 val groupMember = createGroupMember()
                 val deletedAt = Instant.parse("2030-01-01T00:00:00Z")
 
                 groupMember.leave(deletedAt)
 
                 groupMember.deletedAt shouldBe deletedAt
-                groupMember.isActive() shouldBe false
+                groupMember.isJoined() shouldBe false
             }
         }
 
-        `when`("새 멤버십으로 교체할 수 있는지 확인할 때") {
-            then("활성 멤버십은 교체를 거부한다") {
+        `when`("다시 가입할 수 있는지 확인할 때") {
+            then("이미 가입한 멤버십은 가입을 거부한다") {
                 val groupMember = createGroupMember()
 
                 shouldThrow<IllegalStateException> {
-                    groupMember.ensureCanBeReplaced()
-                }.message shouldBe "활성 멤버십은 새 멤버십으로 교체할 수 없습니다."
+                    groupMember.ensureCanJoin()
+                }.message shouldBe "이미 그룹에 가입되어 있습니다."
             }
         }
     }
@@ -64,13 +64,13 @@ class GroupMemberTest : BehaviorSpec({
             }
         }
 
-        `when`("새 멤버십으로 교체할 수 있는지 확인할 때") {
-            then("탈퇴한 멤버십은 교체를 허용한다") {
+        `when`("다시 가입할 수 있는지 확인할 때") {
+            then("탈퇴한 멤버십은 재가입을 허용한다") {
                 val groupMember = createGroupMember()
                 groupMember.leave(Instant.parse("2030-01-01T00:00:00Z"))
 
                 shouldNotThrowAny {
-                    groupMember.ensureCanBeReplaced()
+                    groupMember.ensureCanJoin()
                 }
             }
         }

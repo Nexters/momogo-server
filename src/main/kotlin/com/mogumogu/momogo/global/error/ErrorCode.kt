@@ -22,7 +22,7 @@ enum class ErrorCode(
         message = "유효하지 않은 초대 코드입니다.",
     ),
     ALREADY_JOINED(
-        message = "이미 가입한 그룹입니다.",
+        message = "이미 그룹에 가입되어 있습니다.",
     ),
     GROUP_FULL(
         message = "그룹의 최대 인원을 초과했습니다.",

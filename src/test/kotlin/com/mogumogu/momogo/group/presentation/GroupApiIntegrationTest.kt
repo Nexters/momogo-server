@@ -181,7 +181,7 @@ class GroupApiIntegrationTest(
 
     given("인증된 사용자가 그룹명을 입력하면") {
         `when`("그룹을 생성할 때") {
-            then("초대 코드가 있는 그룹과 생성자의 활성 멤버십을 함께 저장한다") {
+            then("초대 코드가 있는 그룹과 생성자의 멤버십을 함께 저장한다") {
                 cleanDatabase()
                 val registerResponse = register("group-creator")
                 registerResponse.status shouldBe HttpStatus.OK.value()
@@ -206,7 +206,7 @@ class GroupApiIntegrationTest(
                 savedGroup.inviteCode.value shouldBe inviteCode
                 val membership = groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
                 membership shouldNotBe null
-                requireNotNull(membership).isActive() shouldBe true
+                requireNotNull(membership).isJoined() shouldBe true
                 membership.id shouldNotBe null
             }
         }
@@ -335,29 +335,29 @@ class GroupApiIntegrationTest(
         }
     }
 
-    given("초대 코드가 가리키는 그룹에 활성 멤버와 탈퇴한 멤버가 있으면") {
+    given("초대 코드가 가리키는 그룹에 가입 중인 멤버와 탈퇴한 멤버가 있으면") {
         `when`("각 멤버가 초대 코드로 그룹 정보를 조회할 때") {
-            then("활성 멤버 수와 현재 사용자의 활성 참여 여부를 반환한다") {
+            then("현재 가입 인원과 사용자의 참여 여부를 반환한다") {
                 cleanDatabase()
-                val activeMember = registerUser("invitation-info-active")
+                val joinedMember = registerUser("invitation-info-joined")
                 val leftMember = registerUser("invitation-info-left")
-                val anotherActiveUser = userRepository.saveAndFlush(
-                    User(_nickname = "다른 활성 멤버"),
+                val anotherJoinedUser = userRepository.saveAndFlush(
+                    User(_nickname = "다른 가입 멤버"),
                 )
                 val group = saveGroup(
                     name = "우리 가족",
                     code = "INFO01",
                 )
-                saveMember(group, activeMember.user)
-                saveMember(group, anotherActiveUser)
+                saveMember(group, joinedMember.user)
+                saveMember(group, anotherJoinedUser)
                 saveMember(
                     group = group,
                     user = leftMember.user,
                     deletedAt = Instant.parse("2030-01-01T00:00:00Z"),
                 )
 
-                val activeMemberResponse = invitationInfo(
-                    accessToken = activeMember.accessToken,
+                val joinedMemberResponse = invitationInfo(
+                    accessToken = joinedMember.accessToken,
                     code = "INFO01",
                 )
                 val leftMemberResponse = invitationInfo(
@@ -365,15 +365,15 @@ class GroupApiIntegrationTest(
                     code = "INFO01",
                 )
 
-                activeMemberResponse.status shouldBe HttpStatus.OK.value()
-                activeMemberResponse.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
-                val activeMemberBody = objectMapper.readTree(activeMemberResponse.contentAsString)
-                activeMemberBody.propertyNames().toSet() shouldBe
+                joinedMemberResponse.status shouldBe HttpStatus.OK.value()
+                joinedMemberResponse.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
+                val joinedMemberBody = objectMapper.readTree(joinedMemberResponse.contentAsString)
+                joinedMemberBody.propertyNames().toSet() shouldBe
                     setOf("groupId", "groupName", "totalMemberCount", "participated")
-                activeMemberBody["groupId"].longValue() shouldBe requireNotNull(group.id)
-                activeMemberBody["groupName"].stringValue() shouldBe "우리 가족"
-                activeMemberBody["totalMemberCount"].longValue() shouldBe 2L
-                activeMemberBody["participated"].booleanValue() shouldBe true
+                joinedMemberBody["groupId"].longValue() shouldBe requireNotNull(group.id)
+                joinedMemberBody["groupName"].stringValue() shouldBe "우리 가족"
+                joinedMemberBody["totalMemberCount"].longValue() shouldBe 2L
+                joinedMemberBody["participated"].booleanValue() shouldBe true
 
                 leftMemberResponse.status shouldBe HttpStatus.OK.value()
                 leftMemberResponse.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
@@ -440,12 +440,12 @@ class GroupApiIntegrationTest(
                     userId = requireNotNull(registeredUser.user.id),
                 )
                 membership shouldNotBe null
-                requireNotNull(membership).isActive() shouldBe true
+                requireNotNull(membership).isJoined() shouldBe true
             }
         }
     }
 
-    given("이미 그룹에 활성 멤버로 참여한 사용자가 있으면") {
+    given("이미 그룹에 가입한 사용자가 있으면") {
         `when`("같은 초대 코드로 다시 참여를 요청할 때") {
             then("409를 반환하고 멤버십을 중복 저장하지 않는다") {
                 cleanDatabase()
@@ -462,7 +462,7 @@ class GroupApiIntegrationTest(
                         code = "JOIN02",
                     ),
                     status = HttpStatus.CONFLICT,
-                    detail = "이미 가입한 그룹입니다.",
+                    detail = "이미 그룹에 가입되어 있습니다.",
                 )
 
                 groupMemberRepository.count() shouldBe 1L
@@ -505,13 +505,13 @@ class GroupApiIntegrationTest(
                 )
                 newMember shouldNotBe null
                 requireNotNull(newMember).id shouldNotBe leftMember.id
-                newMember.isActive() shouldBe true
+                newMember.isJoined() shouldBe true
                 groupMemberRepository.existsById(requireNotNull(leftMember.id)) shouldBe false
             }
         }
     }
 
-    given("활성 멤버가 8명인 그룹이 있으면") {
+    given("가입 인원이 8명인 그룹이 있으면") {
         `when`("새 사용자가 초대 코드로 참여를 요청할 때") {
             then("409를 반환하고 새 멤버십을 저장하지 않는다") {
                 cleanDatabase()
@@ -536,7 +536,7 @@ class GroupApiIntegrationTest(
                     detail = "그룹의 최대 인원을 초과했습니다.",
                 )
 
-                groupMemberRepository.countActiveByGroupId(requireNotNull(group.id)) shouldBe 8L
+                groupMemberRepository.countJoinedByGroupId(requireNotNull(group.id)) shouldBe 8L
                 groupMemberRepository.findByGroupIdAndUserId(
                     groupId = requireNotNull(group.id),
                     userId = requireNotNull(registeredUser.user.id),
@@ -578,11 +578,11 @@ class GroupApiIntegrationTest(
                         assertProblem(
                             response = response,
                             status = HttpStatus.CONFLICT,
-                            detail = "이미 가입한 그룹입니다.",
+                            detail = "이미 그룹에 가입되어 있습니다.",
                         )
                     }
                     groupMemberRepository.count() shouldBe 1L
-                    groupMemberRepository.countActiveByGroupId(requireNotNull(group.id)) shouldBe 1L
+                    groupMemberRepository.countJoinedByGroupId(requireNotNull(group.id)) shouldBe 1L
                 } finally {
                     executor.shutdownNow()
                 }

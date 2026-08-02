@@ -65,11 +65,11 @@ class GroupRepositoryTest(
         }
     }
 
-    given("활성 멤버와 탈퇴한 멤버가 있는 그룹이면") {
-        `when`("활성 멤버 수를 조회할 때") {
+    given("가입 중인 멤버와 탈퇴한 멤버가 있는 그룹이면") {
+        `when`("현재 가입 인원을 조회할 때") {
             then("탈퇴한 멤버를 제외한 수를 반환한다") {
-                val activeUser = userRepository.saveAndFlush(
-                    User(_nickname = "활성 회원"),
+                val joinedUser = userRepository.saveAndFlush(
+                    User(_nickname = "가입 회원"),
                 )
                 val leftUser = userRepository.saveAndFlush(
                     User(_nickname = "탈퇴 회원"),
@@ -90,12 +90,12 @@ class GroupRepositoryTest(
                 groupMemberRepository.saveAndFlush(
                     GroupMember(
                         _group = group,
-                        _user = activeUser,
+                        _user = joinedUser,
                     ),
                 )
                 groupMemberRepository.saveAndFlush(leftMember)
 
-                groupMemberRepository.countActiveByGroupId(
+                groupMemberRepository.countJoinedByGroupId(
                     groupId = requireNotNull(group.id),
                 ) shouldBe 1L
             }

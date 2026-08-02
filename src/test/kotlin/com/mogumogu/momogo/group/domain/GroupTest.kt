@@ -43,38 +43,38 @@ class GroupTest : BehaviorSpec({
         }
     }
 
-    given("활성 멤버가 7명인 그룹이 있으면") {
+    given("가입 인원이 7명인 그룹이 있으면") {
         `when`("새로운 회원의 가입 가능 여부를 확인할 때") {
             then("가입을 허용한다") {
                 val group = createGroup()
 
                 shouldNotThrowAny {
-                    group.ensureCanJoin(activeMemberCount = 7)
+                    group.ensureCanJoin(joinedMemberCount = 7)
                 }
             }
         }
     }
 
-    given("활성 멤버가 8명인 그룹이 있으면") {
+    given("가입 인원이 8명인 그룹이 있으면") {
         `when`("새로운 회원의 가입 가능 여부를 확인할 때") {
             then("가입을 거부한다") {
                 val group = createGroup()
 
                 shouldThrow<IllegalStateException> {
-                    group.ensureCanJoin(activeMemberCount = 8)
+                    group.ensureCanJoin(joinedMemberCount = 8)
                 }.message shouldBe "그룹은 최대 8명까지 가입할 수 있습니다."
             }
         }
     }
 
-    given("유효하지 않은 활성 멤버 수가 있으면") {
+    given("유효하지 않은 가입 인원이 있으면") {
         `when`("가입 가능 여부를 확인할 때") {
             then("검사를 거부한다") {
                 val group = createGroup()
 
                 shouldThrow<IllegalArgumentException> {
-                    group.ensureCanJoin(activeMemberCount = -1)
-                }.message shouldBe "활성 멤버 수는 0명 이상이어야 합니다."
+                    group.ensureCanJoin(joinedMemberCount = -1)
+                }.message shouldBe "가입 인원은 0명 이상이어야 합니다."
             }
         }
     }
