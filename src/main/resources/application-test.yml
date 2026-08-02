@@ -19,6 +19,12 @@ logging:
     root: WARN
 
 momogo:
+  storage:
+    r2:
+      endpoint: https://00000000000000000000000000000000.r2.cloudflarestorage.com
+      bucket: momogo-test
+      access-key-id: test-access-key-id
+      secret-access-key: test-secret-access-key
   app-version:
     ios:
       latest-version: 1.3.0

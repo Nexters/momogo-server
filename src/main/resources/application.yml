@@ -29,6 +29,12 @@ springdoc:
 momogo:
   openapi:
     server-url: http://localhost:${server.port}
+  storage:
+    r2:
+      endpoint: ${R2_ENDPOINT}
+      bucket: ${R2_BUCKET}
+      access-key-id: ${R2_ACCESS_KEY_ID}
+      secret-access-key: ${R2_SECRET_ACCESS_KEY}
   security:
     jwt:
       issuer: ${JWT_ISSUER:momogo-server}

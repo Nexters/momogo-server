@@ -24,6 +24,12 @@ logging:
     com.mogumogu.momogo: DEBUG
 
 momogo:
+  storage:
+    r2:
+      endpoint: ${R2_ENDPOINT:https://00000000000000000000000000000000.r2.cloudflarestorage.com}
+      bucket: ${R2_BUCKET:momogo-local}
+      access-key-id: ${R2_ACCESS_KEY_ID:local-access-key-id}
+      secret-access-key: ${R2_SECRET_ACCESS_KEY:local-secret-access-key}
   app-version:
     ios:
       latest-version: 1.3.0
