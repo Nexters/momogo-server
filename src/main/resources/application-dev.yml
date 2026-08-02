@@ -11,6 +11,8 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
+    properties:
+      hibernate.jdbc.log.errors: true
 
 server:
   shutdown: graceful
@@ -19,6 +21,10 @@ logging:
   level:
     root: INFO
     com.mogumogu.momogo: DEBUG
+    org.springframework.orm.jpa: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: WARN
+    org.hibernate.orm.jdbc.bind: TRACE
 
 springdoc:
   api-docs:

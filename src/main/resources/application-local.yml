@@ -18,10 +18,15 @@ spring:
     properties:
       hibernate:
         format_sql: true
+      hibernate.jdbc.log.errors: true
 
 logging:
   level:
     com.mogumogu.momogo: DEBUG
+    org.springframework.orm.jpa: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: WARN
+    org.hibernate.orm.jdbc.bind: TRACE
 
 momogo:
   storage:
