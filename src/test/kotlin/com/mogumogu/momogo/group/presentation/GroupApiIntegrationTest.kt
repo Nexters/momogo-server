@@ -37,7 +37,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
-import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -292,10 +291,9 @@ class GroupApiIntegrationTest(
                     deletedAt = clock.instant(),
                 )
 
-                val zoneId = ZoneId.of("Asia/Seoul")
-                val date = LocalDate.now(clock.withZone(zoneId))
-                val todayAtNoon = date.atTime(12, 0).atZone(zoneId).toInstant()
-                val previousDayAtNoon = date.minusDays(1).atTime(12, 0).atZone(zoneId).toInstant()
+                val date = LocalDate.now(clock)
+                val todayAtNoon = date.atTime(12, 0).atZone(clock.zone).toInstant()
+                val previousDayAtNoon = date.minusDays(1).atTime(12, 0).atZone(clock.zone).toInstant()
                 listOf(
                     savePhoto(firstUploader, groupWithPhotos, "photos/list-first.jpg"),
                     savePhoto(secondUploader, groupWithPhotos, "photos/list-second.jpg"),
@@ -376,13 +374,12 @@ class GroupApiIntegrationTest(
             then("오늘 날짜와 빈 그룹 목록을 반환한다") {
                 cleanDatabase()
                 val registeredUser = registerUser("empty-joined-group-list")
-                val zoneId = ZoneId.of("Asia/Seoul")
 
                 val response = getJoinedGroups(registeredUser.accessToken)
 
                 response.status shouldBe HttpStatus.OK.value()
                 val body = objectMapper.readTree(response.contentAsString)
-                body["date"].stringValue() shouldBe LocalDate.now(clock.withZone(zoneId)).toString()
+                body["date"].stringValue() shouldBe LocalDate.now(clock).toString()
                 body["groups"].isArray shouldBe true
                 body["groups"].isEmpty shouldBe true
             }

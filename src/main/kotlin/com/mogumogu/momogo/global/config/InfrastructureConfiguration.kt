@@ -4,13 +4,18 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.security.SecureRandom
 import java.time.Clock
+import java.time.ZoneId
 
 @Configuration(proxyBeanMethods = false)
 class InfrastructureConfiguration {
 
     @Bean
-    fun clock(): Clock = Clock.systemUTC()
+    fun clock(): Clock = Clock.system(APPLICATION_ZONE_ID)
 
     @Bean
     fun secureRandom(): SecureRandom = SecureRandom()
+
+    private companion object {
+        val APPLICATION_ZONE_ID: ZoneId = ZoneId.of("Asia/Seoul")
+    }
 }

@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.LocalDate
-import java.time.ZoneId
 
 @Service
 class GroupService(
@@ -32,7 +31,7 @@ class GroupService(
         }
 
         val memberships = groupMemberRepository.findAllJoinedWithActiveGroupByUserId(userId)
-        val date = LocalDate.now(clock.withZone(GROUP_ACTIVITY_ZONE_ID))
+        val date = LocalDate.now(clock)
         if (memberships.isEmpty()) {
             return GetJoinedGroupsResult(
                 date = date,
@@ -45,8 +44,8 @@ class GroupService(
         }
         val memberCountByGroupId = groupMemberRepository.countJoinedByGroupIds(groupIds)
             .associate { count -> count.groupId to count.totalMemberCount }
-        val startAt = date.atStartOfDay(GROUP_ACTIVITY_ZONE_ID).toInstant()
-        val endAt = date.plusDays(1).atStartOfDay(GROUP_ACTIVITY_ZONE_ID).toInstant()
+        val startAt = date.atStartOfDay(clock.zone).toInstant()
+        val endAt = date.plusDays(1).atStartOfDay(clock.zone).toInstant()
         val photoUploaderCountByGroupId = photoGroupRepository.countTodayPhotoUploadersByGroupIds(
             groupIds = groupIds,
             startAt = startAt,
@@ -222,10 +221,6 @@ class GroupService(
         } catch (_: IllegalStateException) {
             throw ApiException.Conflict(ErrorCode.GROUP_FULL)
         }
-    }
-
-    private companion object {
-        val GROUP_ACTIVITY_ZONE_ID: ZoneId = ZoneId.of("Asia/Seoul")
     }
 }
 
