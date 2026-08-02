@@ -55,6 +55,7 @@ class GroupEntityTest(
 
                 savedGroup.name shouldBe "모고모고"
                 savedGroup.inviteCode shouldBe InviteCode(_value = "AAA111")
+                savedGroup.deletedAt shouldBe null
                 savedGroup.updatedAt shouldBeGreaterThanOrEqualTo savedGroup.createdAt
                 savedGroupMember.group.id shouldBe groupId
                 savedGroupMember.user.id shouldBe userId
@@ -87,6 +88,7 @@ class GroupEntityTest(
 
                 group.updateName("변경된 그룹")
                 group.regenerateInviteCode(InviteCode(_value = "CCC333"))
+                group.delete(deletedAt)
                 groupMember.leave(deletedAt)
                 entityManager.flush()
                 entityManager.clear()
@@ -96,6 +98,8 @@ class GroupEntityTest(
 
                 savedGroup.name shouldBe "변경된 그룹"
                 savedGroup.inviteCode shouldBe InviteCode(_value = "CCC333")
+                savedGroup.deletedAt shouldBe deletedAt
+                savedGroup.isActive() shouldBe false
                 savedGroupMember.deletedAt shouldBe deletedAt
                 savedGroupMember.isJoined() shouldBe false
             }

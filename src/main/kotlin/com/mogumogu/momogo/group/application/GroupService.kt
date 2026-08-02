@@ -10,6 +10,7 @@ import com.mogumogu.momogo.group.infra.GroupRepository
 import com.mogumogu.momogo.user.infra.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 
 @Service
 class GroupService(
@@ -17,6 +18,7 @@ class GroupService(
     private val groupMemberRepository: GroupMemberRepository,
     private val userRepository: UserRepository,
     private val inviteCodeGenerator: InviteCodeGenerator,
+    private val clock: Clock,
 ) {
 
     @Transactional
@@ -40,8 +42,8 @@ class GroupService(
 
     @Transactional
     fun update(command: UpdateGroupCommand): UpdateGroupResult {
-        val group = groupRepository.findById(command.groupId)
-            .orElseThrow { ApiException.NotFound(ErrorCode.GROUP_NOT_FOUND) }
+        val group = groupRepository.findActiveByIdForUpdate(command.groupId)
+            ?: throw ApiException.NotFound(ErrorCode.GROUP_NOT_FOUND)
         val membership = groupMemberRepository.findByGroupIdAndUserId(
             groupId = command.groupId,
             userId = command.userId,
@@ -84,7 +86,7 @@ class GroupService(
     fun join(command: JoinGroupCommand): JoinGroupResult {
         val user = findUserForUpdate(command.userId)
         val inviteCode = parseInviteCode(command.code)
-        val group = groupRepository.findByInviteCodeForUpdate(inviteCode)
+        val group = groupRepository.findActiveByInviteCodeForUpdate(inviteCode)
             ?: throw ApiException.NotFound(ErrorCode.INVALID_INVITATION_CODE)
         val groupId = group.id!!
         val membership = groupMemberRepository.findByGroupIdAndUserId(
@@ -120,6 +122,23 @@ class GroupService(
         )
     }
 
+    @Transactional
+    fun leave(command: LeaveGroupCommand) {
+        val group = groupRepository.findActiveByIdForUpdate(command.groupId)
+            ?: throw ApiException.NotFound(ErrorCode.GROUP_NOT_FOUND)
+        val membership = groupMemberRepository.findJoinedByGroupIdAndUserIdForUpdate(
+            groupId = command.groupId,
+            userId = command.userId,
+        ) ?: throw ApiException.NotFound(ErrorCode.MEMBER_NOT_FOUND)
+        val joinedMemberCount = groupMemberRepository.countJoinedByGroupId(command.groupId)
+        val leftAt = clock.instant()
+
+        membership.leave(leftAt)
+        if (joinedMemberCount == 1L) {
+            group.delete(leftAt)
+        }
+    }
+
     private fun createGroup(name: String): Group =
         try {
             Group(
@@ -131,7 +150,7 @@ class GroupService(
         }
 
     private fun findGroupByInviteCode(code: String): Group =
-        groupRepository.findByInviteCode(parseInviteCode(code))
+        groupRepository.findActiveByInviteCode(parseInviteCode(code))
             ?: throw ApiException.NotFound(ErrorCode.INVALID_INVITATION_CODE)
 
     private fun parseInviteCode(code: String): InviteCode =
@@ -199,4 +218,9 @@ data class JoinGroupCommand(
 data class JoinGroupResult(
     val groupId: Long,
     val code: String,
+)
+
+data class LeaveGroupCommand(
+    val userId: Long,
+    val groupId: Long,
 )

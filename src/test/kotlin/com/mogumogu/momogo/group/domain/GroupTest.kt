@@ -4,6 +4,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
+import java.time.Instant
 
 class GroupTest : BehaviorSpec({
 
@@ -19,6 +20,21 @@ class GroupTest : BehaviorSpec({
                 group.id shouldBe 1L
                 group.name shouldBe "모고모고"
                 group.inviteCode shouldBe InviteCode(_value = "ABC123")
+                group.deletedAt shouldBe null
+                group.isActive() shouldBe true
+            }
+        }
+
+        `when`("그룹을 삭제할 때") {
+            then("최초 삭제 시각을 기록하고 비활성 상태가 된다") {
+                val group = createGroup()
+                val deletedAt = Instant.parse("2030-01-01T00:00:00Z")
+
+                group.delete(deletedAt)
+                group.delete(deletedAt.plusSeconds(1))
+
+                group.deletedAt shouldBe deletedAt
+                group.isActive() shouldBe false
             }
         }
 

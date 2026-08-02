@@ -21,6 +21,12 @@ enum class ErrorCode(
     USER_NOT_FOUND(
         message = "사용자를 찾을 수 없습니다.",
     ),
+    GROUP_NOT_FOUND(
+        message = "그룹을 찾을 수 없습니다.",
+    ),
+    MEMBER_NOT_FOUND(
+        message = "그룹 멤버를 찾을 수 없습니다.",
+    ),
     INVALID_INVITATION_CODE(
         message = "유효하지 않은 초대 코드입니다.",
     ),
@@ -29,9 +35,6 @@ enum class ErrorCode(
     ),
     GROUP_FULL(
         message = "그룹의 최대 인원을 초과했습니다.",
-    ),
-    GROUP_NOT_FOUND(
-        message = "그룹을 찾을 수 없습니다.",
     ),
     NOT_GROUP_MEMBER(
         message = "그룹 멤버가 아닙니다.",

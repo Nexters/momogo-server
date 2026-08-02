@@ -102,6 +102,27 @@ class GroupRepositoryTest(
         }
     }
 
+    given("삭제된 그룹이 있으면") {
+        `when`("활성 그룹 조회와 전체 초대 코드 조회를 함께 사용할 때") {
+            then("API용 조회에서는 제외하고 초대 코드 중복 확인에는 포함한다") {
+                val inviteCode = InviteCode(_value = "SOFT01")
+                val group = groupRepository.saveAndFlush(
+                    Group(
+                        _name = "삭제된 그룹",
+                        _inviteCode = inviteCode,
+                    ).apply {
+                        delete(Instant.parse("2030-01-01T00:00:00Z"))
+                    },
+                )
+
+                groupRepository.findByInviteCode(inviteCode)?.id shouldBe group.id
+                groupRepository.findActiveByInviteCode(inviteCode) shouldBe null
+                groupRepository.findActiveByInviteCodeForUpdate(inviteCode) shouldBe null
+                groupRepository.findActiveByIdForUpdate(requireNotNull(group.id)) shouldBe null
+            }
+        }
+    }
+
     given("탈퇴할 회원과 그룹에 남을 회원의 멤버십이 있으면") {
         `when`("탈퇴할 회원의 멤버십을 모두 삭제할 때") {
             then("해당 회원의 멤버십만 삭제한다") {
