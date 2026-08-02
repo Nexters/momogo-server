@@ -155,6 +155,17 @@ class GroupApiIntegrationTest(
         return performJson(request, json(mapOf("code" to code)))
     }
 
+    fun leaveGroup(
+        accessToken: String?,
+        groupId: Long,
+    ): MockHttpServletResponse {
+        val request = delete("/api/v1/groups/$groupId/members/me")
+        if (accessToken != null) {
+            request.header("Authorization", "Bearer $accessToken")
+        }
+        return mockMvc.perform(request).andReturn().response
+    }
+
     fun registerUser(providerToken: String): RegisteredUserFixture {
         val response = register(providerToken)
         response.status shouldBe HttpStatus.OK.value()
@@ -754,14 +765,211 @@ class GroupApiIntegrationTest(
         }
     }
 
+    given("여러 명이 가입한 그룹의 멤버가 있으면") {
+        `when`("현재 사용자가 그룹에서 탈퇴할 때") {
+            then("멤버십만 soft delete하고 그룹은 유지한다") {
+                cleanDatabase()
+                val leavingMember = registerUser("leaving-group-member")
+                val remainingMember = registerUser("remaining-group-member")
+                val group = saveGroup(
+                    name = "유지되는 그룹",
+                    code = "LEAVE2",
+                )
+                val leavingMembership = saveMember(group, leavingMember.user)
+                saveMember(group, remainingMember.user)
+
+                val response = leaveGroup(
+                    accessToken = leavingMember.accessToken,
+                    groupId = requireNotNull(group.id),
+                )
+
+                response.status shouldBe HttpStatus.OK.value()
+                response.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
+                response.contentAsString shouldBe "{}"
+                groupMemberRepository.findById(requireNotNull(leavingMembership.id))
+                    .orElseThrow()
+                    .isJoined() shouldBe false
+                groupMemberRepository.countJoinedByGroupId(requireNotNull(group.id)) shouldBe 1L
+                val savedGroup = groupRepository.findById(requireNotNull(group.id)).orElseThrow()
+                savedGroup.deletedAt shouldBe null
+                savedGroup.isActive() shouldBe true
+            }
+        }
+    }
+
+    given("마지막 멤버만 가입한 그룹이 있으면") {
+        `when`("마지막 멤버가 그룹에서 탈퇴할 때") {
+            then("멤버십과 그룹을 함께 soft delete하고 초대 코드 사용을 막는다") {
+                cleanDatabase()
+                val lastMember = registerUser("last-group-member")
+                val group = saveGroup(
+                    name = "삭제되는 그룹",
+                    code = "LEAVE1",
+                )
+                val membership = saveMember(group, lastMember.user)
+                val groupId = requireNotNull(group.id)
+
+                val response = leaveGroup(
+                    accessToken = lastMember.accessToken,
+                    groupId = groupId,
+                )
+
+                response.status shouldBe HttpStatus.OK.value()
+                response.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
+                response.contentAsString shouldBe "{}"
+                groupMemberRepository.findById(requireNotNull(membership.id))
+                    .orElseThrow()
+                    .isJoined() shouldBe false
+                groupMemberRepository.countJoinedByGroupId(groupId) shouldBe 0L
+                val deletedGroup = groupRepository.findById(groupId).orElseThrow()
+                deletedGroup.deletedAt shouldNotBe null
+                deletedGroup.isActive() shouldBe false
+                groupRepository.findActiveByInviteCode(InviteCode(_value = "LEAVE1")) shouldBe null
+
+                listOf(
+                    invitationInfo(lastMember.accessToken, "LEAVE1"),
+                    joinGroup(lastMember.accessToken, "LEAVE1"),
+                ).forEach { unavailableGroupResponse ->
+                    assertProblem(
+                        response = unavailableGroupResponse,
+                        status = HttpStatus.NOT_FOUND,
+                        detail = "유효하지 않은 초대 코드입니다.",
+                    )
+                }
+                assertProblem(
+                    response = updateGroupName(
+                        accessToken = lastMember.accessToken,
+                        groupId = groupId,
+                        name = "변경할 수 없는 그룹",
+                    ),
+                    status = HttpStatus.NOT_FOUND,
+                    detail = "그룹을 찾을 수 없습니다.",
+                )
+            }
+        }
+    }
+
+    given("마지막 멤버와 새로 가입할 사용자가 있으면") {
+        `when`("그룹 탈퇴와 참여를 동시에 요청할 때") {
+            then("잠금을 획득한 순서에 따라 그룹 삭제 또는 새 멤버 가입을 일관되게 완료한다") {
+                cleanDatabase()
+                val lastMember = registerUser("concurrent-last-member")
+                val joiningUser = registerUser("concurrent-new-member")
+                val group = saveGroup(
+                    name = "동시 탈퇴 그룹",
+                    code = "RACE03",
+                )
+                saveMember(group, lastMember.user)
+                val groupId = requireNotNull(group.id)
+                val start = CountDownLatch(1)
+                val executor = Executors.newFixedThreadPool(2)
+
+                try {
+                    val leaveFuture = executor.submit<MockHttpServletResponse> {
+                        start.await()
+                        leaveGroup(lastMember.accessToken, groupId)
+                    }
+                    val joinFuture = executor.submit<MockHttpServletResponse> {
+                        start.await()
+                        joinGroup(joiningUser.accessToken, "RACE03")
+                    }
+                    start.countDown()
+
+                    val leaveResponse = leaveFuture.get(5, TimeUnit.SECONDS)
+                    val joinResponse = joinFuture.get(5, TimeUnit.SECONDS)
+
+                    leaveResponse.status shouldBe HttpStatus.OK.value()
+                    (joinResponse.status in setOf(
+                        HttpStatus.OK.value(),
+                        HttpStatus.NOT_FOUND.value(),
+                    )) shouldBe true
+
+                    val savedGroup = groupRepository.findById(groupId).orElseThrow()
+                    if (joinResponse.status == HttpStatus.OK.value()) {
+                        savedGroup.isActive() shouldBe true
+                        groupMemberRepository.countJoinedByGroupId(groupId) shouldBe 1L
+                        groupMemberRepository.findByGroupIdAndUserId(
+                            groupId,
+                            requireNotNull(joiningUser.user.id),
+                        )?.isJoined() shouldBe true
+                    } else {
+                        assertProblem(
+                            response = joinResponse,
+                            status = HttpStatus.NOT_FOUND,
+                            detail = "유효하지 않은 초대 코드입니다.",
+                        )
+                        savedGroup.isActive() shouldBe false
+                        groupMemberRepository.countJoinedByGroupId(groupId) shouldBe 0L
+                    }
+                } finally {
+                    executor.shutdownNow()
+                }
+            }
+        }
+    }
+
+    given("존재하지 않는 그룹 ID가 있으면") {
+        `when`("현재 사용자가 그룹 탈퇴를 요청할 때") {
+            then("그룹 없음 404를 반환한다") {
+                cleanDatabase()
+                val registeredUser = registerUser("missing-leave-group")
+
+                assertProblem(
+                    response = leaveGroup(
+                        accessToken = registeredUser.accessToken,
+                        groupId = Long.MAX_VALUE,
+                    ),
+                    status = HttpStatus.NOT_FOUND,
+                    detail = "그룹을 찾을 수 없습니다.",
+                )
+            }
+        }
+    }
+
+    given("그룹에 가입하지 않았거나 이미 탈퇴한 사용자가 있으면") {
+        `when`("그룹 탈퇴를 요청할 때") {
+            then("그룹 멤버 없음 404를 반환한다") {
+                cleanDatabase()
+                val neverJoinedUser = registerUser("never-joined-leave-group")
+                val leftUser = registerUser("already-left-group")
+                val group = saveGroup(
+                    name = "탈퇴할 수 없는 그룹",
+                    code = "LEAVE0",
+                )
+                val owner = userRepository.saveAndFlush(User(_nickname = "그룹 유지 멤버"))
+                saveMember(group, owner)
+                saveMember(
+                    group = group,
+                    user = leftUser.user,
+                    deletedAt = Instant.parse("2030-01-01T00:00:00Z"),
+                )
+
+                listOf(neverJoinedUser, leftUser).forEach { user ->
+                    assertProblem(
+                        response = leaveGroup(
+                            accessToken = user.accessToken,
+                            groupId = requireNotNull(group.id),
+                        ),
+                        status = HttpStatus.NOT_FOUND,
+                        detail = "그룹 멤버를 찾을 수 없습니다.",
+                    )
+                }
+
+                groupMemberRepository.countJoinedByGroupId(requireNotNull(group.id)) shouldBe 1L
+                groupRepository.findById(requireNotNull(group.id)).orElseThrow().isActive() shouldBe true
+            }
+        }
+    }
+
     given("인증 정보 없이 초대 코드를 사용하면") {
         `when`("그룹 정보 조회와 참여를 요청할 때") {
-            then("모두 401을 반환한다") {
+            then("그룹 정보 조회, 참여와 탈퇴가 모두 401을 반환한다") {
                 cleanDatabase()
 
                 listOf(
                     invitationInfo(accessToken = null, code = "AUTH01"),
                     joinGroup(accessToken = null, code = "AUTH01"),
+                    leaveGroup(accessToken = null, groupId = 1L),
                 ).forEach { response ->
                     assertProblem(
                         response = response,

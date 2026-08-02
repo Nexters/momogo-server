@@ -62,6 +62,8 @@ class OpenApiDocumentationTest(
                     .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/groups/invitations", "post")
                     .requiresBearerAuth() shouldBe true
+                document.operation("/api/v1/groups/{groupId}/members/me", "delete")
+                    .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/user/register", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/login", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/reissue", "post").requiresBearerAuth() shouldBe false
@@ -85,6 +87,10 @@ class OpenApiDocumentationTest(
                     .stringValue() shouldBe commonResponseRef
                 document.operation("/api/v1/groups/invitations", "post")["responses"]["401"]["\$ref"]
                     .stringValue() shouldBe commonResponseRef
+                document.operation(
+                    "/api/v1/groups/{groupId}/members/me",
+                    "delete",
+                )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
 
                 val commonResponse = document["components"]["responses"][
                     OpenApiConfiguration.BEARER_UNAUTHORIZED_RESPONSE
@@ -105,6 +111,8 @@ class OpenApiDocumentationTest(
                     .hasParameter("userId") shouldBe false
                 document.operation("/api/v1/groups/invitations", "post")
                     .hasParameter("userId") shouldBe false
+                document.operation("/api/v1/groups/{groupId}/members/me", "delete")
+                    .hasParameter("userId") shouldBe false
             }
 
             then("user, auth와 group API의 설명과 주요 응답을 제공한다") {
@@ -118,6 +126,10 @@ class OpenApiDocumentationTest(
                 val updateGroupName = document.operation("/api/v1/groups/{groupId}", "patch")
                 val invitationInfo = document.operation("/api/v1/groups/invitations", "get")
                 val joinGroup = document.operation("/api/v1/groups/invitations", "post")
+                val leaveGroup = document.operation(
+                    "/api/v1/groups/{groupId}/members/me",
+                    "delete",
+                )
                 val checkAppVersion = document.operation("/init/versions", "get")
 
                 register["summary"].stringValue() shouldBe "회원가입"
@@ -152,6 +164,10 @@ class OpenApiDocumentationTest(
                 joinGroup.hasResponseMediaType("200", "application/json") shouldBe true
                 joinGroup.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 joinGroup.hasResponseMediaType("409", "application/problem+json") shouldBe true
+                leaveGroup["summary"].stringValue() shouldBe "그룹 탈퇴"
+                leaveGroup.responseCodes() shouldBe setOf("200", "401", "404")
+                leaveGroup.hasResponseMediaType("200", "application/json") shouldBe true
+                leaveGroup.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 checkAppVersion["summary"].stringValue() shouldBe "앱 버전 체크"
                 checkAppVersion.responseCodes() shouldBe setOf("200", "400")
                 checkAppVersion.hasResponseMediaType("200", "application/json") shouldBe true

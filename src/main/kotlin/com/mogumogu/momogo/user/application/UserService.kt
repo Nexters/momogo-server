@@ -3,6 +3,7 @@ package com.mogumogu.momogo.user.application
 import com.mogumogu.momogo.global.error.ApiException
 import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.group.infra.GroupMemberRepository
+import com.mogumogu.momogo.group.infra.GroupRepository
 import com.mogumogu.momogo.photo.infra.PhotoRepository
 import com.mogumogu.momogo.user.domain.User
 import com.mogumogu.momogo.user.infra.LoginAccountRepository
@@ -10,6 +11,7 @@ import com.mogumogu.momogo.user.infra.RefreshTokenRepository
 import com.mogumogu.momogo.user.infra.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 
 @Service
 class UserService(
@@ -17,7 +19,9 @@ class UserService(
     private val loginAccountRepository: LoginAccountRepository,
     private val refreshTokenRepository: RefreshTokenRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val groupRepository: GroupRepository,
     private val photoRepository: PhotoRepository,
+    private val clock: Clock,
 ) {
 
     @Transactional
@@ -40,6 +44,17 @@ class UserService(
     fun withdraw(userId: Long) {
         refreshTokenRepository.findAllByUserIdForUpdate(userId)
         val user = findUser(userId)
+        val deletedAt = clock.instant()
+
+        groupMemberRepository.findJoinedGroupIdsByUserId(userId)
+            .distinct()
+            .sorted()
+            .forEach { groupId ->
+                val group = groupRepository.findActiveByIdForUpdate(groupId) ?: return@forEach
+                if (groupMemberRepository.countJoinedByGroupId(groupId) == 1L) {
+                    group.delete(deletedAt)
+                }
+            }
 
         groupMemberRepository.deleteAllByUserId(userId)
         groupMemberRepository.flush()

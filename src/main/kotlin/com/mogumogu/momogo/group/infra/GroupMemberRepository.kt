@@ -1,7 +1,9 @@
 package com.mogumogu.momogo.group.infra
 
 import com.mogumogu.momogo.group.domain.GroupMember
+import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -21,6 +23,36 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         @Param("userId")
         userId: Long,
     ): GroupMember?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT gm
+        FROM GroupMember gm
+        WHERE gm._group._id = :groupId
+          AND gm._user._id = :userId
+          AND gm._deletedAt IS NULL
+        """,
+    )
+    fun findJoinedByGroupIdAndUserIdForUpdate(
+        @Param("groupId")
+        groupId: Long,
+        @Param("userId")
+        userId: Long,
+    ): GroupMember?
+
+    @Query(
+        """
+        SELECT gm._group._id
+        FROM GroupMember gm
+        WHERE gm._user._id = :userId
+          AND gm._deletedAt IS NULL
+        """,
+    )
+    fun findJoinedGroupIdsByUserId(
+        @Param("userId")
+        userId: Long,
+    ): List<Long>
 
     @Query(
         """

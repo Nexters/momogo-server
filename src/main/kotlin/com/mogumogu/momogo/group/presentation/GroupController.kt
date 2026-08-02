@@ -6,6 +6,7 @@ import com.mogumogu.momogo.group.application.CreateGroupCommand
 import com.mogumogu.momogo.group.application.GetGroupInvitationCommand
 import com.mogumogu.momogo.group.application.GroupService
 import com.mogumogu.momogo.group.application.JoinGroupCommand
+import com.mogumogu.momogo.group.application.LeaveGroupCommand
 import com.mogumogu.momogo.group.application.UpdateGroupCommand
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -18,6 +19,7 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.springframework.http.ProblemDetail
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -279,6 +281,51 @@ class GroupController(
             groupId = result.groupId,
             code = result.code,
         )
+    }
+
+    @Operation(
+        summary = "그룹 탈퇴",
+        description = "현재 사용자를 그룹에서 탈퇴시킵니다. 마지막 멤버가 탈퇴하면 그룹도 삭제합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "그룹 탈퇴 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(type = "object", example = "{}"),
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "그룹 또는 현재 사용자의 활성 멤버십을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = "application/problem+json",
+                        schema = Schema(implementation = ProblemDetail::class),
+                    ),
+                ],
+            ),
+        ],
+    )
+    @DeleteMapping("/{groupId}/members/me")
+    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
+    fun leave(
+        @RequestUserId
+        userId: Long,
+        @PathVariable
+        groupId: Long,
+    ): Map<String, Any> {
+        groupService.leave(
+            LeaveGroupCommand(
+                userId = userId,
+                groupId = groupId,
+            ),
+        )
+        return emptyMap()
     }
 }
 

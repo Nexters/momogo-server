@@ -2,6 +2,7 @@ package com.mogumogu.momogo.group.domain
 
 import com.mogumogu.momogo.global.entity.BaseEntity
 import jakarta.persistence.*
+import java.time.Instant
 
 @Entity
 @Table(
@@ -24,6 +25,9 @@ class Group(
 
     @field:Embedded
     private var _inviteCode: InviteCode,
+
+    @field:Column(name = "deleted_at")
+    private var _deletedAt: Instant? = null,
 ) : BaseEntity() {
 
     val id: Long?
@@ -34,6 +38,9 @@ class Group(
 
     val inviteCode: InviteCode
         get() = _inviteCode
+
+    val deletedAt: Instant?
+        get() = _deletedAt
 
     init {
         validateName(_name)
@@ -47,6 +54,14 @@ class Group(
     fun regenerateInviteCode(inviteCode: InviteCode) {
         _inviteCode = inviteCode
     }
+
+    fun delete(at: Instant) {
+        if (_deletedAt == null) {
+            _deletedAt = at
+        }
+    }
+
+    fun isActive(): Boolean = _deletedAt == null
 
     fun ensureCanJoin(joinedMemberCount: Long) {
         require(joinedMemberCount >= 0) { "가입 인원은 0명 이상이어야 합니다." }

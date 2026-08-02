@@ -15,10 +15,44 @@ interface GroupRepository : JpaRepository<Group, Long> {
         inviteCode: InviteCode,
     ): Group?
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT g FROM Group g WHERE g._inviteCode = :inviteCode")
-    fun findByInviteCodeForUpdate(
+    @Query(
+        """
+        SELECT g
+        FROM Group g
+        WHERE g._inviteCode = :inviteCode
+          AND g._deletedAt IS NULL
+        """,
+    )
+    fun findActiveByInviteCode(
         @Param("inviteCode")
         inviteCode: InviteCode,
+    ): Group?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT g
+        FROM Group g
+        WHERE g._inviteCode = :inviteCode
+          AND g._deletedAt IS NULL
+        """,
+    )
+    fun findActiveByInviteCodeForUpdate(
+        @Param("inviteCode")
+        inviteCode: InviteCode,
+    ): Group?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT g
+        FROM Group g
+        WHERE g._id = :groupId
+          AND g._deletedAt IS NULL
+        """,
+    )
+    fun findActiveByIdForUpdate(
+        @Param("groupId")
+        groupId: Long,
     ): Group?
 }

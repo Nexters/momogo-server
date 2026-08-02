@@ -622,7 +622,7 @@ class AuthUserApiIntegrationTest(
 
     given("로그인 계정과 여러 refresh token, 그룹 멤버십 및 사진을 가진 사용자가 있으면") {
         `when`("access token으로 회원 탈퇴할 때") {
-            then("인증 정보와 그룹 멤버십을 삭제하고 그룹과 업로더가 제거된 사진은 유지한다") {
+            then("인증 정보와 그룹 멤버십을 삭제하고 마지막 멤버가 사라진 그룹도 soft delete한다") {
                 cleanDatabase()
                 val providerToken = "withdraw-guest"
                 val registerBody = objectMapper.readTree(register(providerToken).contentAsString)
@@ -669,6 +669,9 @@ class AuthUserApiIntegrationTest(
                 refreshTokenRepository.count() shouldBe 0L
                 groupMemberRepository.count() shouldBe 0L
                 groupRepository.existsById(requireNotNull(group.id)) shouldBe true
+                val deletedGroup = groupRepository.findById(requireNotNull(group.id)).orElseThrow()
+                deletedGroup.deletedAt shouldNotBe null
+                deletedGroup.isActive() shouldBe false
                 photoRepository.count() shouldBe 1L
                 val remainingPhoto = photoRepository.findById(photoId).orElseThrow()
                 remainingPhoto.uploader shouldBe null
