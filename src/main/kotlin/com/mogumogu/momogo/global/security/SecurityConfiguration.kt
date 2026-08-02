@@ -39,6 +39,7 @@ class SecurityConfiguration(
             }
             .authorizeHttpRequests { requests ->
                 requests
+                    .requestMatchers(HttpMethod.GET, "/init/versions").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/user/register").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/reissue").permitAll()

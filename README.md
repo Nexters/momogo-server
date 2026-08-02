@@ -1,5 +1,17 @@
 # momogo-server
 
+## 실행 프로필
+
+서버를 실행할 때는 `local`, `dev`, `prod` 중 실행 환경에 맞는 프로필을 반드시 지정한다. 기본 프로필만 사용하는 실행은 지원하지 않는다.
+
+로컬에서는 다음과 같이 `local` 프로필을 지정한다.
+
+```sh
+SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
+```
+
+dev와 prod 배포에서는 Docker Compose가 프로필을 지정하며, 테스트에서는 `test` 프로필을 사용한다.
+
 ## JWT 설정
 
 서버 실행 전 아래 환경변수를 설정해야 한다.
@@ -8,6 +20,10 @@
 - `JWT_ISSUER`: access token의 `iss` 값이다. 생략하면 `momogo-server`를 사용한다.
 
 예를 들어 OpenSSL로 secret을 만들려면 `openssl rand -base64 32`를 실행한다. 테스트에서는 `application-test.yml`의 테스트 전용 secret만 사용한다.
+
+## 앱 버전 설정
+
+플랫폼별 최신 버전, 최소 지원 버전과 스토어 URL은 각 프로필의 `application-{profile}.yml`에 있는 `momogo.app-version`에서 관리한다. 최소 지원 버전은 최신 버전보다 높게 설정할 수 없다.
 
 ## Docker Compose 배포
 

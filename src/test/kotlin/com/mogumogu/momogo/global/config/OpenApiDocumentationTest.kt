@@ -66,6 +66,7 @@ class OpenApiDocumentationTest(
                 document.operation("/api/v1/auth/login", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/reissue", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/logout", "delete").requiresBearerAuth() shouldBe false
+                document.operation("/init/versions", "get").requiresBearerAuth() shouldBe false
             }
 
             then("Bearer 인증 API에 공통 401 응답을 적용한다") {
@@ -117,6 +118,7 @@ class OpenApiDocumentationTest(
                 val updateGroupName = document.operation("/api/v1/groups/{groupId}", "patch")
                 val invitationInfo = document.operation("/api/v1/groups/invitations", "get")
                 val joinGroup = document.operation("/api/v1/groups/invitations", "post")
+                val checkAppVersion = document.operation("/init/versions", "get")
 
                 register["summary"].stringValue() shouldBe "회원가입"
                 register.responseCodes() shouldBe setOf("200", "400", "409")
@@ -150,6 +152,10 @@ class OpenApiDocumentationTest(
                 joinGroup.hasResponseMediaType("200", "application/json") shouldBe true
                 joinGroup.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 joinGroup.hasResponseMediaType("409", "application/problem+json") shouldBe true
+                checkAppVersion["summary"].stringValue() shouldBe "앱 버전 체크"
+                checkAppVersion.responseCodes() shouldBe setOf("200", "400")
+                checkAppVersion.hasResponseMediaType("200", "application/json") shouldBe true
+                checkAppVersion.hasResponseMediaType("400", "application/problem+json") shouldBe true
             }
 
             then("요청 스키마에 현재 지원 범위와 입력 제한을 표시한다") {
@@ -191,6 +197,8 @@ class OpenApiDocumentationTest(
                     setOf("groupId", "groupName")
                 updateGroupNameSchema["properties"].propertyNames().asSequence().toSet() shouldBe
                     setOf("groupId", "groupName")
+                schemas["AppVersionResponse"]["required"].stringValues().toSet() shouldBe
+                    setOf("latestVersion", "minSupportedVersion", "forceUpdate", "updateUrl")
 
                 val invitationInfo = document.operation("/api/v1/groups/invitations", "get")
                 val invitationInfoSchema = document.responseSchema(invitationInfo, "200")
