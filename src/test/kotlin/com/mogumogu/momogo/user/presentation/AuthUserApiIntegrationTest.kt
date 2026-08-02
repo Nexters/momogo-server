@@ -140,6 +140,14 @@ class AuthUserApiIntegrationTest(
         return performJson(request, json(mapOf("nickname" to nickname)))
     }
 
+    fun getMe(accessToken: String?): MockHttpServletResponse {
+        val request = get("/api/v1/user/me")
+        if (accessToken != null) {
+            request.header("Authorization", "Bearer $accessToken")
+        }
+        return mockMvc.perform(request).andReturn().response
+    }
+
     fun withdraw(accessToken: String): MockHttpServletResponse =
         mockMvc.perform(
             delete("/api/v1/user")
@@ -405,6 +413,57 @@ class AuthUserApiIntegrationTest(
     }
 
     given("인증된 사용자가 있으면") {
+        `when`("내 정보를 조회할 때") {
+            then("토큰의 사용자 ID와 닉네임을 JSON으로 반환한다") {
+                cleanDatabase()
+                val registerBody = objectMapper.readTree(
+                    register(
+                        providerToken = "get-me-guest",
+                        nickname = "내 닉네임",
+                    ).contentAsString,
+                )
+                val userId = registerBody["userId"].longValue()
+                val accessToken = registerBody["accessToken"].stringValue()
+
+                val response = getMe(accessToken)
+
+                assertJsonResponse(response)
+                val body = objectMapper.readTree(response.contentAsString)
+                body.propertyNames().toSet() shouldBe setOf("userId", "nickname")
+                body["userId"].longValue() shouldBe userId
+                body["nickname"].stringValue() shouldBe "내 닉네임"
+            }
+        }
+
+        `when`("인증 없이 내 정보를 조회할 때") {
+            then("401 ProblemDetail을 반환한다") {
+                cleanDatabase()
+
+                assertProblem(
+                    response = getMe(null),
+                    status = HttpStatus.UNAUTHORIZED,
+                    detail = "인증 정보가 올바르지 않습니다.",
+                )
+            }
+        }
+
+        `when`("토큰의 사용자가 존재하지 않을 때") {
+            then("404 ProblemDetail을 반환한다") {
+                cleanDatabase()
+                val accessToken = issueCustomAccessToken(
+                    subject = Long.MAX_VALUE.toString(),
+                    issuedAtOffset = Duration.ZERO,
+                    expiresAtOffset = Duration.ofDays(1),
+                )
+
+                assertProblem(
+                    response = getMe(accessToken),
+                    status = HttpStatus.NOT_FOUND,
+                    detail = "사용자를 찾을 수 없습니다.",
+                )
+            }
+        }
+
         `when`("앞뒤 공백이 있는 닉네임으로 변경할 때") {
             then("공백을 제거한 닉네임과 사용자 ID를 JSON으로 반환한다") {
                 cleanDatabase()

@@ -89,6 +89,48 @@ class UserController(
     }
 
     @Operation(
+        summary = "내 정보 조회",
+        description = "현재 사용자의 ID와 닉네임을 조회합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "내 정보 조회 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = UserResponse::class),
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "사용자를 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = "application/problem+json",
+                        schema = Schema(implementation = ProblemDetail::class),
+                    ),
+                ],
+            ),
+        ],
+    )
+    @GetMapping("/me")
+    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
+    fun getMe(
+        @RequestUserId
+        userId: Long,
+    ): UserResponse {
+        val result = userService.getUser(userId)
+
+        return UserResponse(
+            userId = result.userId,
+            nickname = result.nickname,
+        )
+    }
+
+    @Operation(
         summary = "닉네임 변경",
         description = "현재 사용자의 닉네임을 변경합니다.",
     )

@@ -24,6 +24,17 @@ class UserService(
     private val clock: Clock,
 ) {
 
+    @Transactional(readOnly = true)
+    fun getUser(userId: Long): GetUserResult {
+        val user = userRepository.findById(userId)
+            .orElseThrow { ApiException.NotFound(ErrorCode.USER_NOT_FOUND) }
+
+        return GetUserResult(
+            userId = checkNotNull(user.id) { "저장된 사용자 ID가 없습니다." },
+            nickname = user.nickname,
+        )
+    }
+
     @Transactional
     fun updateNickname(command: UpdateNicknameCommand): UpdateNicknameResult {
         val user = findUser(command.userId)
@@ -71,6 +82,11 @@ class UserService(
         userRepository.findByIdForUpdate(userId)
             ?: throw ApiException.NotFound(ErrorCode.USER_NOT_FOUND)
 }
+
+data class GetUserResult(
+    val userId: Long,
+    val nickname: String,
+)
 
 data class UpdateNicknameCommand(
     val userId: Long,
