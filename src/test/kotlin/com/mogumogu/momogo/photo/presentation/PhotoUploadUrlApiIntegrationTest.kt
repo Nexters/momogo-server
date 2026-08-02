@@ -105,7 +105,7 @@ class PhotoUploadUrlApiIntegrationTest(
 
                 val response = issueUploadUrl(
                     accessToken = registeredUser.accessToken,
-                    content = json(mapOf("contentType" to "image/png")),
+                    content = json(mapOf("contentType" to "IMAGE/PNG")),
                 )
 
                 val issuedAtLatest = LocalDateTime.now(clock)

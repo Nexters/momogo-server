@@ -39,7 +39,7 @@ local 프로필의 endpoint와 인증 정보 기본값은 애플리케이션 실
 
 R2 API token은 각 환경의 버킷만 읽고 쓸 수 있도록 범위를 제한하며 실제 인증 정보는 저장소에 커밋하지 않는다. 참고: [Cloudflare R2 S3 API](https://developers.cloudflare.com/r2/api/s3/api/)
 
-클라이언트는 발급 요청에 사용한 이미지 `Content-Type` 헤더를 그대로 지정해 presigned URL로 PUT해야 한다. 버킷의 public access는 필요하지 않으며, 브라우저에서 직접 업로드한다면 R2 버킷 CORS에서 사용하는 origin, PUT 메서드와 `Content-Type` 헤더를 별도로 허용해야 한다.
+클라이언트는 발급 요청에 사용한 이미지 `Content-Type` 값을 대소문자까지 그대로 지정해 presigned URL로 PUT해야 한다. 버킷의 public access는 필요하지 않으며, 브라우저에서 직접 업로드한다면 R2 버킷 CORS에서 사용하는 origin, PUT 메서드와 `Content-Type` 헤더를 별도로 허용해야 한다.
 
 ## Docker Compose 배포
 

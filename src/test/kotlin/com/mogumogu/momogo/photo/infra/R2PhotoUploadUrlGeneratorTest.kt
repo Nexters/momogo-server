@@ -34,9 +34,9 @@ class R2PhotoUploadUrlGeneratorTest(
                 objectId = UUID.fromString("9f8b3a1c-2d4e-4a6b-8c0d-123456789abc"),
                 contentType = requireNotNull(PhotoContentType.from("image/png")),
             )
-            val contentType = requireNotNull(PhotoContentType.from("image/png"))
+            val contentTypeValue = "IMAGE/PNG"
             val issuedAtEarliest = LocalDateTime.now(clock)
-            val result = generator.generate(objectKey, contentType)
+            val result = generator.generate(objectKey, contentTypeValue)
             val issuedAtLatest = LocalDateTime.now(clock)
             val uri = URI(result.uploadUrl)
             val queryParameters = uri.queryParameters()

@@ -43,7 +43,7 @@ class PhotoUploadUrlService(
         )
         val generated = uploadUrlGenerator.generate(
             objectKey = objectKey,
-            contentType = contentType,
+            contentTypeValue = contentTypeValue,
         )
 
         return PhotoUploadUrlResult(

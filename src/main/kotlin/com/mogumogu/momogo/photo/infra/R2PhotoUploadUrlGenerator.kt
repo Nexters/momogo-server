@@ -3,7 +3,6 @@ package com.mogumogu.momogo.photo.infra
 import com.mogumogu.momogo.global.storage.r2.R2Properties
 import com.mogumogu.momogo.photo.application.GeneratedPhotoUploadUrl
 import com.mogumogu.momogo.photo.application.PhotoUploadUrlGenerator
-import com.mogumogu.momogo.photo.domain.PhotoContentType
 import com.mogumogu.momogo.photo.domain.PhotoObjectKey
 import org.springframework.stereotype.Component
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
@@ -22,7 +21,7 @@ class R2PhotoUploadUrlGenerator(
 
     override fun generate(
         objectKey: PhotoObjectKey,
-        contentType: PhotoContentType,
+        contentTypeValue: String,
     ): GeneratedPhotoUploadUrl {
         val presignedRequest = presigner.presignPutObject(
             PutObjectPresignRequest
@@ -33,7 +32,7 @@ class R2PhotoUploadUrlGenerator(
                         .builder()
                         .bucket(properties.bucket)
                         .key(objectKey.value)
-                        .contentType(contentType.value)
+                        .contentType(contentTypeValue)
                         .build(),
                 ).build(),
         )
