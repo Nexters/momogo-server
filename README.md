@@ -9,6 +9,10 @@
 
 예를 들어 OpenSSL로 secret을 만들려면 `openssl rand -base64 32`를 실행한다. 테스트에서는 `application-test.yml`의 테스트 전용 secret만 사용한다.
 
+## 앱 버전 설정
+
+플랫폼별 최신 버전, 최소 지원 버전과 스토어 URL은 각 프로필의 `application-{profile}.yml`에 있는 `momogo.app-version`에서 관리한다. 최소 지원 버전은 최신 버전보다 높게 설정할 수 없다.
+
 ## Docker Compose 배포
 
 dev와 prod는 각각 `deploy/compose.dev.yml`, `deploy/compose.prod.yml`을 사용한다. 두 환경 모두 애플리케이션 포트는 호스트의 loopback 주소에만 공개하므로, 외부 요청은 같은 서버의 리버스 프록시를 통해 전달해야 한다.
