@@ -8,6 +8,16 @@
 - 요구사항을 충족하는 가장 단순한 구현을 우선하며, 명시되지 않은 재시도나 추상화 계층을 선제적으로 추가하지 않는다.
 - 전체 검증은 `./gradlew check`로 실행한다. 테스트만 다시 실행할 때는 `./gradlew test`를 사용한다.
 
+## OpenAPI 문서 작성
+
+- API 메서드는 `@Operation`으로 요약과 설명을 작성한다.
+- 컨트롤러에 반복적인 `@ApiResponses`, `ApiResponse`, `Content`를 직접 나열하지 않는다. 성공 응답 스키마는 함수 반환 타입 추론을 사용한다.
+- 완성된 요청 본문과 성공 응답 예시는 `@ApiExamples`와 `OpenApiExample`로 `components/examples`에 연결한다. 요청 본문이 없으면 기본값인 `OpenApiExample.NONE`을 사용하고, 같은 형태의 예시는 재사용한다.
+- DTO 필드 설명, 입력 제한과 대표값은 `@Schema`에 작성한다. 쿼리·경로 파라미터의 설명과 예시는 `@Parameter`에 작성하고, 큰 JSON 문자열을 컨트롤러 어노테이션에 직접 넣지 않는다.
+- API의 실제 실행 경로에서 발생 가능한 오류만 `@ApiErrors`의 HTTP 상태별 속성에 `ErrorCode`로 열거한다. 런타임에서는 `ApiException.BadRequest(ErrorCode.INVALID_REQUEST)`처럼 상태에 맞는 sealed 하위 타입을 사용하고, `ErrorCode`에는 외부에 공개해도 안전한 메시지만 정의한다. `code` 같은 `ProblemDetail` 확장 필드가 있으면 오류 예시에도 반영한다.
+- Bearer 인증의 공통 401 응답은 OpenAPI customizer가 자동으로 추가하므로 각 API에 중복 선언하지 않는다. 같은 HTTP 상태의 오류가 여러 개면 각각 구분되는 named example로 문서화한다.
+- API를 추가하거나 변경할 때 `OpenApiDocumentationTest`에서 인증 여부, 응답 코드·미디어 타입·스키마와 요청·성공·오류 예시를 함께 검증한다.
+
 ## 도메인 엔티티 구현
 
 - 도메인 모델과 JPA 엔티티를 별도 클래스로 나누지 않고 기능별 `domain` 패키지에서 하나의 클래스로 관리한다.
@@ -29,6 +39,8 @@
 - 모든 작업을 시작하기 전에 원격 `main`을 최신 상태로 가져온다.
 - 현재 작업 브랜치를 최신 `origin/main` 기준으로 리베이스한 뒤 변경을 시작한다.
 - 미커밋 변경이 있으면 유실되지 않도록 보존하고, 리베이스 후 변경 복원 여부와 충돌 여부를 확인한다.
+- `gh auth status`와 GitHub 원격 접근 명령은 반드시 샌드박스 밖에서 실행한다. 샌드박스 안에서 발생한 인증 실패만으로 토큰 만료나 재로그인이 필요하다고 판단하거나 사용자에게 보고하지 않는다.
+- `git fetch`, `git push`, `gh pr create`처럼 인증정보와 네트워크를 사용하는 명령이 샌드박스에서 실패하면 사용자에게 다시 묻지 말고 샌드박스 밖에서 재실행해 실제 결과를 확인한다.
 
 ### 브랜치
 

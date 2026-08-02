@@ -1,22 +1,22 @@
 package com.mogumogu.momogo.user.presentation
 
 import com.mogumogu.momogo.global.config.OpenApiConfiguration
+import com.mogumogu.momogo.global.error.ErrorCode
+import com.mogumogu.momogo.global.openapi.ApiErrors
+import com.mogumogu.momogo.global.openapi.ApiExamples
+import com.mogumogu.momogo.global.openapi.OpenApiExample
 import com.mogumogu.momogo.global.security.RequestUserId
 import com.mogumogu.momogo.user.application.AuthService
 import com.mogumogu.momogo.user.application.UpdateNicknameCommand
 import com.mogumogu.momogo.user.application.UserService
 import com.mogumogu.momogo.user.domain.LoginProvider
 import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
-import io.swagger.v3.oas.annotations.responses.ApiResponse
-import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
-import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.*
 
 @Tag(
@@ -34,39 +34,16 @@ class UserController(
         summary = "회원가입",
         description = "로그인 정보와 닉네임으로 가입하고 액세스 토큰과 리프레시 토큰을 발급합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "회원가입 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(implementation = AuthResponse::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "400",
-                description = "요청 값이 올바르지 않거나 지원하지 않는 로그인 방식",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "409",
-                description = "이미 가입된 계정",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
+    @ApiExamples(
+        request = OpenApiExample.REGISTER_REQUEST,
+        success = OpenApiExample.AUTH_RESPONSE,
+    )
+    @ApiErrors(
+        badRequest = [
+            ErrorCode.INVALID_REQUEST,
+            ErrorCode.UNSUPPORTED_PROVIDER,
         ],
+        conflict = [ErrorCode.DUPLICATE_LOGIN_ACCOUNT],
     )
     @PostMapping("/register")
     fun register(
@@ -92,30 +69,8 @@ class UserController(
         summary = "내 정보 조회",
         description = "현재 사용자의 ID와 닉네임을 조회합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "내 정보 조회 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(implementation = UserResponse::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "404",
-                description = "사용자를 찾을 수 없음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-        ],
-    )
+    @ApiExamples(success = OpenApiExample.USER_RESPONSE)
+    @ApiErrors(notFound = [ErrorCode.USER_NOT_FOUND])
     @GetMapping("/me")
     @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
     fun getMe(
@@ -134,39 +89,13 @@ class UserController(
         summary = "닉네임 변경",
         description = "현재 사용자의 닉네임을 변경합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "닉네임 변경 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(implementation = UserResponse::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "400",
-                description = "닉네임이 비어 있거나 12자를 초과함",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "404",
-                description = "사용자를 찾을 수 없음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-        ],
+    @ApiExamples(
+        request = OpenApiExample.UPDATE_NICKNAME_REQUEST,
+        success = OpenApiExample.UPDATED_USER_RESPONSE,
+    )
+    @ApiErrors(
+        badRequest = [ErrorCode.INVALID_REQUEST],
+        notFound = [ErrorCode.USER_NOT_FOUND],
     )
     @PatchMapping
     @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
@@ -194,30 +123,8 @@ class UserController(
         summary = "회원 탈퇴",
         description = "현재 사용자의 계정과 관련 정보를 삭제합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "회원 탈퇴 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(type = "object", example = "{}"),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "404",
-                description = "사용자를 찾을 수 없음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-        ],
-    )
+    @ApiExamples(success = OpenApiExample.EMPTY_OBJECT_RESPONSE)
+    @ApiErrors(notFound = [ErrorCode.USER_NOT_FOUND])
     @DeleteMapping
     @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
     fun withdraw(

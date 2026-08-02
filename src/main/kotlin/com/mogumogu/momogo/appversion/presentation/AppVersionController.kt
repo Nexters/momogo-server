@@ -1,14 +1,14 @@
 package com.mogumogu.momogo.appversion.presentation
 
 import com.mogumogu.momogo.appversion.application.AppVersionService
+import com.mogumogu.momogo.global.error.ErrorCode
+import com.mogumogu.momogo.global.openapi.ApiErrors
+import com.mogumogu.momogo.global.openapi.ApiExamples
+import com.mogumogu.momogo.global.openapi.OpenApiExample
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
-import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
-import io.swagger.v3.oas.annotations.responses.ApiResponse
-import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
-import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -28,28 +28,11 @@ class AppVersionController(
         summary = "앱 버전 체크",
         description = "현재 앱 버전이 최소 지원 버전보다 낮은지 확인합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "앱 버전 체크 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(implementation = AppVersionResponse::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "400",
-                description = "지원하지 않는 플랫폼이거나 앱 버전 형식이 올바르지 않음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
+    @ApiExamples(success = OpenApiExample.APP_VERSION_RESPONSE)
+    @ApiErrors(
+        badRequest = [
+            ErrorCode.INVALID_PLATFORM,
+            ErrorCode.INVALID_REQUEST,
         ],
     )
     @GetMapping
@@ -65,7 +48,7 @@ class AppVersionController(
         @Parameter(
             description = "현재 앱 버전(MAJOR.MINOR.PATCH)",
             required = true,
-            example = "1.2.0",
+            example = "1.0.0",
         )
         @RequestParam
         appVersion: String,

@@ -1,17 +1,17 @@
 package com.mogumogu.momogo.user.presentation
 
+import com.mogumogu.momogo.global.error.ErrorCode
+import com.mogumogu.momogo.global.openapi.ApiErrors
+import com.mogumogu.momogo.global.openapi.ApiExamples
+import com.mogumogu.momogo.global.openapi.OpenApiExample
 import com.mogumogu.momogo.user.application.AuthService
 import com.mogumogu.momogo.user.domain.LoginProvider
 import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
-import io.swagger.v3.oas.annotations.responses.ApiResponse
-import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
-import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.*
 
 @Tag(
@@ -28,39 +28,16 @@ class AuthController(
         summary = "로그인",
         description = "로그인 정보를 확인하고 액세스 토큰과 리프레시 토큰을 발급합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "로그인 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(implementation = AuthResponse::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "400",
-                description = "요청 값이 올바르지 않거나 지원하지 않는 로그인 방식",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "401",
-                description = "로그인 정보가 올바르지 않음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
+    @ApiExamples(
+        request = OpenApiExample.LOGIN_REQUEST,
+        success = OpenApiExample.AUTH_RESPONSE,
+    )
+    @ApiErrors(
+        badRequest = [
+            ErrorCode.INVALID_REQUEST,
+            ErrorCode.UNSUPPORTED_PROVIDER,
         ],
+        unauthorized = [ErrorCode.INVALID_AUTH_CREDENTIALS],
     )
     @PostMapping("/login")
     fun login(
@@ -85,39 +62,13 @@ class AuthController(
         summary = "토큰 재발급",
         description = "리프레시 토큰을 새 액세스 토큰과 리프레시 토큰으로 교체합니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "토큰 재발급 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(implementation = ReissueResponse::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "400",
-                description = "요청 값이 올바르지 않음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "401",
-                description = "리프레시 토큰이 유효하지 않음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-        ],
+    @ApiExamples(
+        request = OpenApiExample.REFRESH_TOKEN_REQUEST,
+        success = OpenApiExample.REISSUE_RESPONSE,
+    )
+    @ApiErrors(
+        badRequest = [ErrorCode.INVALID_REQUEST],
+        unauthorized = [ErrorCode.INVALID_REFRESH_TOKEN],
     )
     @PostMapping("/reissue")
     fun reissue(
@@ -137,30 +88,11 @@ class AuthController(
         summary = "로그아웃",
         description = "리프레시 토큰을 폐기합니다. 존재하지 않거나 이미 폐기된 토큰을 보내도 성공하며, 액세스 토큰은 만료 전까지 사용할 수 있습니다.",
     )
-    @ApiResponses(
-        value = [
-            ApiResponse(
-                responseCode = "200",
-                description = "로그아웃 성공",
-                content = [
-                    Content(
-                        mediaType = "application/json",
-                        schema = Schema(type = "object", example = "{}"),
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "400",
-                description = "요청 값이 올바르지 않음",
-                content = [
-                    Content(
-                        mediaType = "application/problem+json",
-                        schema = Schema(implementation = ProblemDetail::class),
-                    ),
-                ],
-            ),
-        ],
+    @ApiExamples(
+        request = OpenApiExample.REFRESH_TOKEN_REQUEST,
+        success = OpenApiExample.EMPTY_OBJECT_RESPONSE,
     )
+    @ApiErrors(badRequest = [ErrorCode.INVALID_REQUEST])
     @DeleteMapping("/logout")
     fun logout(
         @Valid
