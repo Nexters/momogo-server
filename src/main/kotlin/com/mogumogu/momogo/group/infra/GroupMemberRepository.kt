@@ -13,6 +13,22 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         """
         SELECT gm
         FROM GroupMember gm
+        JOIN FETCH gm._group g
+        WHERE gm._user._id = :userId
+          AND gm._deletedAt IS NULL
+          AND g._deletedAt IS NULL
+        ORDER BY gm._id DESC
+        """,
+    )
+    fun findAllJoinedWithActiveGroupByUserId(
+        @Param("userId")
+        userId: Long,
+    ): List<GroupMember>
+
+    @Query(
+        """
+        SELECT gm
+        FROM GroupMember gm
         WHERE gm._group._id = :groupId
           AND gm._user._id = :userId
         """,
@@ -67,6 +83,23 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         groupId: Long,
     ): Long
 
+    @Query(
+        """
+        SELECT new com.mogumogu.momogo.group.infra.GroupMemberCount(
+            gm._group._id,
+            COUNT(gm)
+        )
+        FROM GroupMember gm
+        WHERE gm._group._id IN :groupIds
+          AND gm._deletedAt IS NULL
+        GROUP BY gm._group._id
+        """,
+    )
+    fun countJoinedByGroupIds(
+        @Param("groupIds")
+        groupIds: List<Long>,
+    ): List<GroupMemberCount>
+
     @Modifying(flushAutomatically = true)
     @Query(
         """
@@ -79,3 +112,8 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         userId: Long,
     ): Int
 }
+
+data class GroupMemberCount(
+    val groupId: Long,
+    val totalMemberCount: Long,
+)

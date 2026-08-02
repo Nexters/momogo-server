@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.time.LocalDate
 
 @Tag(
     name = "그룹",
@@ -38,6 +39,55 @@ import org.springframework.web.bind.annotation.RestController
 class GroupController(
     private val groupService: GroupService,
 ) {
+
+    @Operation(
+        summary = "내가 참여한 그룹 조회",
+        description = "현재 사용자가 참여 중인 그룹과 오늘 사진을 올린 그룹 멤버 수를 조회합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "참여 그룹 조회 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = JoinedGroupsResponse::class),
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "사용자를 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = "application/problem+json",
+                        schema = Schema(implementation = ProblemDetail::class),
+                    ),
+                ],
+            ),
+        ],
+    )
+    @GetMapping
+    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
+    fun getJoinedGroups(
+        @RequestUserId
+        userId: Long,
+    ): JoinedGroupsResponse {
+        val result = groupService.getJoinedGroups(userId)
+
+        return JoinedGroupsResponse(
+            date = result.date,
+            groups = result.groups.map { group ->
+                JoinedGroupResponse(
+                    groupId = group.groupId,
+                    groupName = group.groupName,
+                    totalMemberCount = group.totalMemberCount,
+                    todayPhotoUploaderCount = group.todayPhotoUploaderCount,
+                )
+            },
+        )
+    }
 
     @Operation(
         summary = "그룹 생성",
@@ -328,6 +378,59 @@ class GroupController(
         return emptyMap()
     }
 }
+
+@Schema(description = "현재 사용자가 참여 중인 그룹 목록")
+data class JoinedGroupsResponse(
+    @field:Schema(
+        description = "오늘의 그룹 활동을 계산한 날짜(Asia/Seoul)",
+        example = "2026-08-02",
+        type = "string",
+        format = "date",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val date: LocalDate,
+
+    @field:Schema(
+        description = "현재 참여 중인 그룹 목록",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val groups: List<JoinedGroupResponse>,
+)
+
+@Schema(description = "참여 중인 그룹 요약")
+data class JoinedGroupResponse(
+    @field:Schema(
+        description = "그룹 ID",
+        example = "10",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val groupId: Long,
+
+    @field:Schema(
+        description = "그룹명",
+        example = "우리 가족",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val groupName: String,
+
+    @field:Schema(
+        description = "현재 그룹에 참여 중인 멤버 수",
+        example = "4",
+        minimum = "1",
+        maximum = "8",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val totalMemberCount: Long,
+
+    @field:Schema(
+        description = "오늘 그룹에 사진을 올린 현재 멤버 수",
+        example = "2",
+        minimum = "0",
+        maximum = "8",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val todayPhotoUploaderCount: Long,
+)
 
 @Schema(description = "그룹 생성 요청")
 data class CreateGroupRequest(
