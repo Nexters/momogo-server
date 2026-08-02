@@ -1,5 +1,17 @@
 # momogo-server
 
+## 실행 프로필
+
+서버를 실행할 때는 `local`, `dev`, `prod` 중 실행 환경에 맞는 프로필을 반드시 지정한다. 기본 프로필만 사용하는 실행은 지원하지 않는다.
+
+로컬에서는 다음과 같이 `local` 프로필을 지정한다.
+
+```sh
+SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
+```
+
+dev와 prod 배포에서는 Docker Compose가 프로필을 지정하며, 테스트에서는 `test` 프로필을 사용한다.
+
 ## JWT 설정
 
 서버 실행 전 아래 환경변수를 설정해야 한다.
