@@ -54,15 +54,15 @@ class GroupService(
 
         return GetJoinedGroupsResult(
             date = date,
-            groups = memberships.map { membership ->
+            groups = memberships.mapNotNull { membership ->
                 val group = membership.group
                 val groupId = checkNotNull(group.id) { "저장된 그룹 ID가 없습니다." }
+                val totalMemberCount = memberCountByGroupId[groupId]
+                    ?: return@mapNotNull null
                 JoinedGroupResult(
                     groupId = groupId,
                     groupName = group.name,
-                    totalMemberCount = checkNotNull(memberCountByGroupId[groupId]) {
-                        "가입 중인 그룹의 멤버 수가 없습니다."
-                    },
+                    totalMemberCount = totalMemberCount,
                     todayPhotoUploaderCount = photoUploaderCountByGroupId[groupId] ?: 0L,
                 )
             },
