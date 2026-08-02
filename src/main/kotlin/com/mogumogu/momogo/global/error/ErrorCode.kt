@@ -6,6 +6,9 @@ enum class ErrorCode(
     INVALID_REQUEST(
         message = "요청 값이 올바르지 않습니다.",
     ),
+    INVALID_CONTENT_TYPE(
+        message = "이미지 MIME 타입이 올바르지 않습니다.",
+    ),
     INVALID_PLATFORM(
         message = "지원하지 않는 플랫폼입니다.",
     ),

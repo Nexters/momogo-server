@@ -68,6 +68,8 @@ class OpenApiDocumentationTest(
                     .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/groups/{groupId}/members/me", "delete")
                     .requiresBearerAuth() shouldBe true
+                document.operation("/api/v1/photos/upload-urls", "post")
+                    .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/user/register", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/login", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/reissue", "post").requiresBearerAuth() shouldBe false
@@ -98,6 +100,10 @@ class OpenApiDocumentationTest(
                 document.operation(
                     "/api/v1/groups/{groupId}/members/me",
                     "delete",
+                )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
+                document.operation(
+                    "/api/v1/photos/upload-urls",
+                    "post",
                 )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
 
                 val commonResponse = document["components"]["responses"][
@@ -133,9 +139,11 @@ class OpenApiDocumentationTest(
                     .hasParameter("userId") shouldBe false
                 document.operation("/api/v1/groups/{groupId}/members/me", "delete")
                     .hasParameter("userId") shouldBe false
+                document.operation("/api/v1/photos/upload-urls", "post")
+                    .hasParameter("userId") shouldBe false
             }
 
-            then("user, auth와 group API의 설명과 주요 응답을 제공한다") {
+            then("user, auth, group과 photo API의 설명과 주요 응답을 제공한다") {
                 val register = document.operation("/api/v1/user/register", "post")
                 val login = document.operation("/api/v1/auth/login", "post")
                 val reissue = document.operation("/api/v1/auth/reissue", "post")
@@ -152,6 +160,7 @@ class OpenApiDocumentationTest(
                     "/api/v1/groups/{groupId}/members/me",
                     "delete",
                 )
+                val issuePhotoUploadUrl = document.operation("/api/v1/photos/upload-urls", "post")
                 val checkAppVersion = document.operation("/init/versions", "get")
 
                 register["summary"].stringValue() shouldBe "회원가입"
@@ -198,6 +207,11 @@ class OpenApiDocumentationTest(
                 leaveGroup.responseCodes() shouldBe setOf("200", "401", "404")
                 leaveGroup.hasResponseMediaType("200", "application/json") shouldBe true
                 leaveGroup.hasResponseMediaType("404", "application/problem+json") shouldBe true
+                issuePhotoUploadUrl["summary"].stringValue() shouldBe "사진 업로드 URL 발급"
+                issuePhotoUploadUrl.responseCodes() shouldBe setOf("200", "400", "401", "404")
+                issuePhotoUploadUrl.hasResponseMediaType("200", "application/json") shouldBe true
+                issuePhotoUploadUrl.hasResponseMediaType("400", "application/problem+json") shouldBe true
+                issuePhotoUploadUrl.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 checkAppVersion["summary"].stringValue() shouldBe "앱 버전 체크"
                 checkAppVersion.responseCodes() shouldBe setOf("200", "400")
                 checkAppVersion.hasResponseMediaType("200", "application/json") shouldBe true
@@ -332,6 +346,18 @@ class OpenApiDocumentationTest(
                     setOf("groupId", "groupName")
                 schemas["AppVersionResponse"]["required"].stringValues().toSet() shouldBe
                     setOf("latestVersion", "minSupportedVersion", "forceUpdate", "updateUrl")
+
+                schemas["PhotoUploadUrlRequest"]["required"].stringValues().toSet() shouldBe
+                    setOf("contentType")
+                val issuePhotoUploadUrl = document.operation("/api/v1/photos/upload-urls", "post")
+                val photoUploadUrlSchema = document.responseSchema(issuePhotoUploadUrl, "200")
+                photoUploadUrlSchema["required"].stringValues().toSet() shouldBe
+                    setOf("uploadUrl", "objectKey", "expiresAt")
+                photoUploadUrlSchema["properties"].propertyNames().asSequence().toSet() shouldBe
+                    setOf("uploadUrl", "objectKey", "expiresAt")
+                photoUploadUrlSchema["properties"]["expiresAt"]["type"].stringValue() shouldBe "string"
+                photoUploadUrlSchema["properties"]["expiresAt"]["format"].stringValue() shouldBe
+                    "date-time"
 
                 val invitationInfo = document.operation("/api/v1/groups/invitations", "get")
                 val invitationInfoSchema = document.responseSchema(invitationInfo, "200")
@@ -475,6 +501,14 @@ private val operationExampleExpectations = listOf(
         successSchema = null,
     ),
     OperationExampleExpectation(
+        path = "/api/v1/photos/upload-urls",
+        method = "post",
+        request = OpenApiExample.PHOTO_UPLOAD_URL_REQUEST,
+        requestSchema = "PhotoUploadUrlRequest",
+        success = OpenApiExample.PHOTO_UPLOAD_URL_RESPONSE,
+        successSchema = "PhotoUploadUrlResponse",
+    ),
+    OperationExampleExpectation(
         path = "/init/versions",
         method = "get",
         success = OpenApiExample.APP_VERSION_RESPONSE,
@@ -615,6 +649,18 @@ private val errorResponseExpectations = listOf(
         "delete",
         "404",
         setOf(ErrorCode.GROUP_NOT_FOUND, ErrorCode.MEMBER_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/photos/upload-urls",
+        "post",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST, ErrorCode.INVALID_CONTENT_TYPE),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/photos/upload-urls",
+        "post",
+        "404",
+        setOf(ErrorCode.USER_NOT_FOUND),
     ),
     ErrorResponseExpectation(
         "/init/versions",
