@@ -56,6 +56,10 @@ class OpenApiDocumentationTest(
                 document.operation("/api/v1/user", "patch").requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/user", "delete").requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/groups", "post").requiresBearerAuth() shouldBe true
+                document.operation("/api/v1/groups/invitations", "get")
+                    .requiresBearerAuth() shouldBe true
+                document.operation("/api/v1/groups/invitations", "post")
+                    .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/user/register", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/login", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/reissue", "post").requiresBearerAuth() shouldBe false
@@ -72,6 +76,10 @@ class OpenApiDocumentationTest(
                     .stringValue() shouldBe commonResponseRef
                 document.operation("/api/v1/groups", "post")["responses"]["401"]["\$ref"]
                     .stringValue() shouldBe commonResponseRef
+                document.operation("/api/v1/groups/invitations", "get")["responses"]["401"]["\$ref"]
+                    .stringValue() shouldBe commonResponseRef
+                document.operation("/api/v1/groups/invitations", "post")["responses"]["401"]["\$ref"]
+                    .stringValue() shouldBe commonResponseRef
 
                 val commonResponse = document["components"]["responses"][
                     OpenApiConfiguration.BEARER_UNAUTHORIZED_RESPONSE
@@ -85,6 +93,10 @@ class OpenApiDocumentationTest(
                 document.operation("/api/v1/user", "patch").hasParameter("userId") shouldBe false
                 document.operation("/api/v1/user", "delete").hasParameter("userId") shouldBe false
                 document.operation("/api/v1/groups", "post").hasParameter("userId") shouldBe false
+                document.operation("/api/v1/groups/invitations", "get")
+                    .hasParameter("userId") shouldBe false
+                document.operation("/api/v1/groups/invitations", "post")
+                    .hasParameter("userId") shouldBe false
             }
 
             then("user, auth와 group API의 설명과 주요 응답을 제공한다") {
@@ -95,6 +107,8 @@ class OpenApiDocumentationTest(
                 val updateNickname = document.operation("/api/v1/user", "patch")
                 val withdraw = document.operation("/api/v1/user", "delete")
                 val createGroup = document.operation("/api/v1/groups", "post")
+                val invitationInfo = document.operation("/api/v1/groups/invitations", "get")
+                val joinGroup = document.operation("/api/v1/groups/invitations", "post")
 
                 register["summary"].stringValue() shouldBe "회원가입"
                 register.responseCodes() shouldBe setOf("200", "400", "409")
@@ -115,6 +129,13 @@ class OpenApiDocumentationTest(
                 createGroup.responseCodes() shouldBe setOf("200", "400", "401", "404")
                 createGroup.hasResponseMediaType("200", "application/json") shouldBe true
                 createGroup.hasResponseMediaType("400", "application/problem+json") shouldBe true
+                invitationInfo.responseCodes() shouldBe setOf("200", "401", "404")
+                invitationInfo.hasResponseMediaType("200", "application/json") shouldBe true
+                invitationInfo.hasResponseMediaType("404", "application/problem+json") shouldBe true
+                joinGroup.responseCodes() shouldBe setOf("200", "401", "404", "409")
+                joinGroup.hasResponseMediaType("200", "application/json") shouldBe true
+                joinGroup.hasResponseMediaType("404", "application/problem+json") shouldBe true
+                joinGroup.hasResponseMediaType("409", "application/problem+json") shouldBe true
             }
 
             then("요청 스키마에 현재 지원 범위와 입력 제한을 표시한다") {
@@ -145,6 +166,28 @@ class OpenApiDocumentationTest(
                     setOf("name")
                 schemas["CreateGroupResponse"]["required"].stringValues().toSet() shouldBe
                     setOf("groupId", "groupName", "inviteCode")
+
+                val invitationInfo = document.operation("/api/v1/groups/invitations", "get")
+                val invitationInfoSchema = document.responseSchema(invitationInfo, "200")
+                invitationInfoSchema["required"].stringValues().toSet() shouldBe
+                    setOf("groupId", "groupName", "totalMemberCount", "participated")
+                invitationInfoSchema["properties"].propertyNames().asSequence().toSet() shouldBe
+                    setOf("groupId", "groupName", "totalMemberCount", "participated")
+                invitationInfoSchema["properties"]["groupId"]["type"].stringValue() shouldBe "integer"
+                invitationInfoSchema["properties"]["groupName"]["type"].stringValue() shouldBe "string"
+                invitationInfoSchema["properties"]["totalMemberCount"]["type"].stringValue() shouldBe
+                    "integer"
+                invitationInfoSchema["properties"]["participated"]["type"].stringValue() shouldBe
+                    "boolean"
+
+                val joinGroup = document.operation("/api/v1/groups/invitations", "post")
+                val joinGroupSchema = document.responseSchema(joinGroup, "200")
+                joinGroupSchema["required"].stringValues().toSet() shouldBe
+                    setOf("groupId", "code")
+                joinGroupSchema["properties"].propertyNames().asSequence().toSet() shouldBe
+                    setOf("groupId", "code")
+                joinGroupSchema["properties"]["groupId"]["type"].stringValue() shouldBe "integer"
+                joinGroupSchema["properties"]["code"]["type"].stringValue() shouldBe "string"
             }
         }
 
@@ -184,6 +227,15 @@ private fun JsonNode.hasResponseMediaType(
     mediaType: String,
 ): Boolean =
     this["responses"][responseCode]["content"].has(mediaType)
+
+private fun JsonNode.responseSchema(
+    operation: JsonNode,
+    responseCode: String,
+): JsonNode {
+    val schema = operation["responses"][responseCode]["content"]["application/json"]["schema"]
+    val schemaName = schema["\$ref"].stringValue().substringAfterLast('/')
+    return this["components"]["schemas"][schemaName]
+}
 
 private fun JsonNode.stringValues(): List<String> =
     values().map { value -> value.stringValue() }

@@ -35,6 +35,20 @@ interface RefreshTokenRepository : JpaRepository<RefreshToken, Long> {
         tokenHash: String
     ): RefreshToken?
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT refreshToken
+        FROM RefreshToken refreshToken
+        WHERE refreshToken._user._id = :userId
+        ORDER BY refreshToken._id
+        """,
+    )
+    fun findAllByUserIdForUpdate(
+        @Param("userId")
+        userId: Long,
+    ): List<RefreshToken>
+
     @Modifying(flushAutomatically = true)
     @Query(
         """

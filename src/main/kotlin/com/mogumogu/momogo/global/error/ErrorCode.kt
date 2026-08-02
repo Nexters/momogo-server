@@ -18,6 +18,15 @@ enum class ErrorCode(
     USER_NOT_FOUND(
         message = "사용자를 찾을 수 없습니다.",
     ),
+    INVALID_INVITATION_CODE(
+        message = "유효하지 않은 초대 코드입니다.",
+    ),
+    ALREADY_JOINED(
+        message = "이미 그룹에 가입되어 있습니다.",
+    ),
+    GROUP_FULL(
+        message = "그룹의 최대 인원을 초과했습니다.",
+    ),
     DUPLICATE_LOGIN_ACCOUNT(
         message = "이미 등록된 로그인 계정입니다.",
     ),

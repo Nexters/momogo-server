@@ -61,9 +61,9 @@ class GroupMember(
         }
     }
 
-    fun rejoin() {
-        _deletedAt = null
+    fun ensureCanJoin() {
+        check(!isJoined()) { "이미 그룹에 가입되어 있습니다." }
     }
 
-    fun isActive(): Boolean = _deletedAt == null
+    fun isJoined(): Boolean = _deletedAt == null
 }

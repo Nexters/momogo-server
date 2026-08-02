@@ -97,7 +97,7 @@ class GroupEntityTest(
                 savedGroup.name shouldBe "변경된 그룹"
                 savedGroup.inviteCode shouldBe InviteCode(_value = "CCC333")
                 savedGroupMember.deletedAt shouldBe deletedAt
-                savedGroupMember.isActive() shouldBe false
+                savedGroupMember.isJoined() shouldBe false
             }
         }
     }

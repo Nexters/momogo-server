@@ -38,6 +38,7 @@ class UserService(
 
     @Transactional
     fun withdraw(userId: Long) {
+        refreshTokenRepository.findAllByUserIdForUpdate(userId)
         val user = findUser(userId)
 
         groupMemberRepository.deleteAllByUserId(userId)
@@ -52,8 +53,8 @@ class UserService(
     }
 
     private fun findUser(userId: Long): User =
-        userRepository.findById(userId)
-            .orElseThrow { ApiException.NotFound(ErrorCode.USER_NOT_FOUND) }
+        userRepository.findByIdForUpdate(userId)
+            ?: throw ApiException.NotFound(ErrorCode.USER_NOT_FOUND)
 }
 
 data class UpdateNicknameCommand(

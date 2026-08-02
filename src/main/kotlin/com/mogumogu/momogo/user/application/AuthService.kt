@@ -55,7 +55,8 @@ class AuthService(
         val providerId = providerTokenAuthenticationService.authenticate(provider, providerToken)
         val loginAccount = loginAccountRepository.findByProviderAndProviderId(provider, providerId)
             ?: throw ApiException.Unauthorized(ErrorCode.INVALID_AUTH_CREDENTIALS)
-        val user = loginAccount.user
+        val user = userRepository.findByIdForUpdate(loginAccount.user.id!!)
+            ?: throw ApiException.Unauthorized(ErrorCode.INVALID_AUTH_CREDENTIALS)
 
         return user.toAuthenticatedUser(tokenIssuer.issue(user))
     }
@@ -65,6 +66,8 @@ class AuthService(
         val tokenHash = refreshTokenProvider.hash(refreshToken)
         val savedToken = refreshTokenRepository.findByTokenHashForUpdate(tokenHash)
             ?: throw ApiException.Unauthorized(ErrorCode.INVALID_REFRESH_TOKEN)
+        val user = userRepository.findByIdForUpdate(savedToken.user.id!!)
+            ?: throw ApiException.Unauthorized(ErrorCode.INVALID_REFRESH_TOKEN)
         val now = clock.instant()
 
         if (!savedToken.isActive(now)) {
@@ -72,7 +75,7 @@ class AuthService(
         }
 
         savedToken.revoke(now)
-        val issuedTokens = tokenIssuer.issue(savedToken.user)
+        val issuedTokens = tokenIssuer.issue(user)
 
         return ReissuedTokens(
             accessToken = issuedTokens.accessToken,

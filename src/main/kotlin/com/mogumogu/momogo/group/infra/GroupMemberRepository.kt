@@ -30,7 +30,7 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
           AND gm._deletedAt IS NULL
         """,
     )
-    fun countActiveByGroupId(
+    fun countJoinedByGroupId(
         @Param("groupId")
         groupId: Long,
     ): Long

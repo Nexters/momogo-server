@@ -55,8 +55,14 @@ class UserRepositoryTest(
                 val refreshTokenId = requireNotNull(refreshToken.id)
 
                 userRepository.findById(userId).orElseThrow().nickname shouldBe "모고"
+                userRepository.findByIdForUpdate(userId)?.id shouldBe userId
                 loginAccountRepository.findById(loginAccountId).orElseThrow().provider shouldBe LoginProvider.KAKAO
                 refreshTokenRepository.findById(refreshTokenId).orElseThrow().tokenHash shouldBe "d".repeat(64)
+
+                UserRepository::class.java
+                    .getMethod("findByIdForUpdate", Long::class.javaPrimitiveType)
+                    .getAnnotation(Lock::class.java)
+                    .value shouldBe LockModeType.PESSIMISTIC_WRITE
 
                 refreshTokenRepository.deleteById(refreshTokenId)
                 refreshTokenRepository.flush()
@@ -110,9 +116,15 @@ class UserRepositoryTest(
                 refreshTokenRepository.findByTokenHash(tokenHash)?.id shouldBe refreshToken.id
                 refreshTokenRepository.findByTokenHash("f".repeat(64)) shouldBe null
                 refreshTokenRepository.findByTokenHashForUpdate(tokenHash)?.id shouldBe refreshToken.id
+                refreshTokenRepository.findAllByUserIdForUpdate(user.id!!)
+                    .map(RefreshToken::id) shouldBe listOf(refreshToken.id)
 
                 RefreshTokenRepository::class.java
                     .getMethod("findByTokenHashForUpdate", String::class.java)
+                    .getAnnotation(Lock::class.java)
+                    .value shouldBe LockModeType.PESSIMISTIC_WRITE
+                RefreshTokenRepository::class.java
+                    .getMethod("findAllByUserIdForUpdate", Long::class.javaPrimitiveType)
                     .getAnnotation(Lock::class.java)
                     .value shouldBe LockModeType.PESSIMISTIC_WRITE
             }
