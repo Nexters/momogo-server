@@ -28,17 +28,18 @@ class PhotoTest : BehaviorSpec({
         }
 
         `when`("허용되는 경계값으로 사진을 생성할 때") {
-            then("object key 512자, content type 100자와 1 byte 크기를 허용한다") {
+            then("object key 512자, 이미지 content type 133자와 1 byte 크기를 허용한다") {
+                val extension = "a".repeat(127)
                 val photo = Photo(
                     _uploader = User(_nickname = "모고"),
-                    _objectKey = "k".repeat(512),
+                    _objectKey = "k".repeat(512 - extension.length - 1) + ".$extension",
                     _sizeBytes = 1L,
-                    _contentType = "t".repeat(100),
+                    _contentType = "image/$extension",
                 )
 
                 photo.objectKey.length shouldBe 512
                 photo.sizeBytes shouldBe 1L
-                photo.contentType.length shouldBe 100
+                photo.contentType.length shouldBe PhotoContentType.MAX_VALUE_LENGTH
             }
         }
     }
@@ -80,10 +81,21 @@ class PhotoTest : BehaviorSpec({
             }
         }
 
-        `when`("content type이 100자를 초과할 때") {
+        `when`("이미지 content type이 허용 길이를 초과할 때") {
             then("사진 생성을 거부한다") {
                 shouldThrow<IllegalArgumentException> {
-                    createPhoto(_contentType = "t".repeat(101))
+                    createPhoto(_contentType = "image/${"a".repeat(128)}")
+                }
+            }
+        }
+
+        `when`("content type이 object key 확장자와 다를 때") {
+            then("사진 생성을 거부한다") {
+                shouldThrow<IllegalArgumentException> {
+                    createPhoto(
+                        _objectKey = "photos/photo.png",
+                        _contentType = "image/jpeg",
+                    )
                 }
             }
         }

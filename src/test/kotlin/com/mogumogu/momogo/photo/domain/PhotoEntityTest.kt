@@ -39,14 +39,11 @@ class PhotoEntityTest(
                     uploader = uploader,
                     objectKey = "photos/persisted-photo.jpg",
                 )
-                val photoGroup = PhotoGroup(
-                    _photo = photo,
-                    _group = group,
-                )
 
                 entityManager.persist(uploader)
                 entityManager.persist(group)
                 entityManager.persist(photo)
+                val photoGroup = PhotoGroup(_photo = photo, _group = group)
                 entityManager.persist(photoGroup)
                 entityManager.flush()
 
@@ -79,13 +76,10 @@ class PhotoEntityTest(
                     uploader = uploader,
                     objectKey = "photos/unlinked-photo.jpg",
                 )
-                val photoGroup = PhotoGroup(
-                    _photo = photo,
-                    _group = group,
-                )
                 entityManager.persist(uploader)
                 entityManager.persist(group)
                 entityManager.persist(photo)
+                val photoGroup = PhotoGroup(_photo = photo, _group = group)
                 entityManager.persist(photoGroup)
                 entityManager.flush()
 
@@ -139,13 +133,10 @@ class PhotoEntityTest(
                     uploader = uploader,
                     objectKey = "photos/group-duplicate.jpg",
                 )
-                val unlinkedPhotoGroup = PhotoGroup(
-                    _photo = photo,
-                    _group = group,
-                )
                 entityManager.persist(uploader)
                 entityManager.persist(group)
                 entityManager.persist(photo)
+                val unlinkedPhotoGroup = PhotoGroup(_photo = photo, _group = group)
                 entityManager.persist(unlinkedPhotoGroup)
                 entityManager.flush()
                 unlinkedPhotoGroup.unlink(Instant.parse("2030-01-01T00:00:00Z"))
@@ -153,10 +144,7 @@ class PhotoEntityTest(
 
                 shouldThrow<ConstraintViolationException> {
                     entityManager.persist(
-                        PhotoGroup(
-                            _photo = photo,
-                            _group = group,
-                        ),
+                        PhotoGroup(_photo = photo, _group = group),
                     )
                     entityManager.flush()
                 }

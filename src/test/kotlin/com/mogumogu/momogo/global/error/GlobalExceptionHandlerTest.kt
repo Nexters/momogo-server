@@ -35,6 +35,8 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
                 ApiException.Forbidden(ErrorCode.FORBIDDEN) to HttpStatus.FORBIDDEN,
                 ApiException.NotFound(ErrorCode.RESOURCE_NOT_FOUND) to HttpStatus.NOT_FOUND,
                 ApiException.Conflict(ErrorCode.ALREADY_JOINED) to HttpStatus.CONFLICT,
+                ApiException.UnprocessableEntity(ErrorCode.OBJECT_NOT_UPLOADED) to
+                    HttpStatus.UNPROCESSABLE_CONTENT,
             )
 
             expectations.forEach { (exception, expectedStatus) ->
@@ -153,6 +155,18 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
             }
         }
 
+        `when`("원인 체인에 사진 object key unique constraint가 있을 때") {
+            val response = mockMvc.perform(get("/test/duplicate-photo"))
+                .andReturn()
+                .response
+            val body = objectMapper.readTree(response.contentAsString)
+
+            then("이미 등록된 사진 409 ProblemDetail로 응답한다") {
+                response.status shouldBe 409
+                body["detail"].stringValue() shouldBe ErrorCode.PHOTO_ALREADY_REGISTERED.message
+            }
+        }
+
         `when`("다른 constraint 위반일 때") {
             val response = mockMvc.perform(get("/test/other-data-integrity"))
                 .andReturn()
@@ -209,17 +223,13 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
 
         @GetMapping("/duplicate-login-account")
         fun duplicateLoginAccount(): Nothing =
-            throw DataIntegrityViolationException(
-                "로그인 계정 저장 실패",
-                RuntimeException(
-                    "중첩된 원인",
-                    ConstraintViolationException(
-                        "unique constraint 위반",
-                        SQLException("unique constraint 위반"),
-                        """PUBLIC."UK_LOGIN_ACCOUNT_PROVIDER_PROVIDER_ID_INDEX_8 ON PUBLIC.LOGIN_ACCOUNT"""",
-                    ),
-                ),
+            throw constraintViolation(
+                """PUBLIC."UK_LOGIN_ACCOUNT_PROVIDER_PROVIDER_ID_INDEX_8 ON PUBLIC.LOGIN_ACCOUNT"""",
             )
+
+        @GetMapping("/duplicate-photo")
+        fun duplicatePhoto(): Nothing =
+            throw constraintViolation("PUBLIC.UQ_PHOTO_OBJECT_KEY_INDEX_4")
 
         @GetMapping("/other-data-integrity")
         fun otherDataIntegrity(): Nothing =
@@ -235,6 +245,19 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
         @GetMapping("/illegal-argument")
         fun illegalArgument(): Nothing =
             throw IllegalArgumentException("민감한 내부 메시지")
+
+        private fun constraintViolation(constraintName: String): DataIntegrityViolationException =
+            DataIntegrityViolationException(
+                "저장 실패",
+                RuntimeException(
+                    "중첩된 원인",
+                    ConstraintViolationException(
+                        "unique constraint 위반",
+                        SQLException("unique constraint 위반"),
+                        constraintName,
+                    ),
+                ),
+            )
     }
 
     private data class TestRequest(

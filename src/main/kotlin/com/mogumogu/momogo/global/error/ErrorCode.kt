@@ -9,6 +9,9 @@ enum class ErrorCode(
     INVALID_CONTENT_TYPE(
         message = "이미지 MIME 타입이 올바르지 않습니다.",
     ),
+    INVALID_OBJECT_KEY(
+        message = "사진 오브젝트 키가 올바르지 않습니다.",
+    ),
     INVALID_PLATFORM(
         message = "지원하지 않는 플랫폼입니다.",
     ),
@@ -41,6 +44,15 @@ enum class ErrorCode(
     ),
     NOT_GROUP_MEMBER(
         message = "그룹 멤버가 아닙니다.",
+    ),
+    PHOTO_ALREADY_REGISTERED(
+        message = "이미 등록된 사진입니다.",
+    ),
+    DAILY_GROUP_UPLOAD_LIMIT_EXCEEDED(
+        message = "오늘 이미 사진을 업로드한 그룹이 있습니다.",
+    ),
+    OBJECT_NOT_UPLOADED(
+        message = "업로드된 사진 파일을 찾을 수 없습니다.",
     ),
     DUPLICATE_LOGIN_ACCOUNT(
         message = "이미 등록된 로그인 계정입니다.",

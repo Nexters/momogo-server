@@ -14,6 +14,8 @@ class PhotoContentType private constructor(
     override fun toString(): String = value
 
     companion object {
+        const val MAX_VALUE_LENGTH = 133
+
         private val IMAGE_CONTENT_TYPE_PATTERN = Regex(
             "^image/([a-z0-9][a-z0-9!#$&^_.+-]{0,126})$",
         )

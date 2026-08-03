@@ -10,6 +10,7 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.S3Configuration
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
+import java.time.Duration
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(R2Properties::class)
@@ -24,6 +25,7 @@ class R2Configuration {
             .credentialsProvider(properties.credentialsProvider())
             .httpClientBuilder(UrlConnectionHttpClient.builder())
             .serviceConfiguration(s3Configuration())
+            .overrideConfiguration { it.apiCallTimeout(API_CALL_TIMEOUT) }
             .build()
 
     @Bean
@@ -50,5 +52,8 @@ class R2Configuration {
 
     private companion object {
         val R2_REGION: Region = Region.of("auto")
+
+        // 사진 등록 트랜잭션 안에서 R2를 호출하므로, 재시도까지 포함한 상한을 둬서 DB 커넥션 점유를 막는다.
+        val API_CALL_TIMEOUT: Duration = Duration.ofSeconds(5)
     }
 }

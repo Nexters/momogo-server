@@ -11,25 +11,26 @@ interface PhotoGroupRepository : JpaRepository<PhotoGroup, Long> {
         """
         SELECT new com.mogumogu.momogo.photo.infra.TodayPhotoUploaderCount(
             pg._group._id,
-            COUNT(DISTINCT photo._uploader._id)
+            COUNT(DISTINCT uploader._id)
         )
         FROM PhotoGroup pg
         JOIN pg._photo photo
+        JOIN photo._uploader uploader
         WHERE pg._group._id IN :groupIds
           AND pg._deletedAt IS NULL
-          AND photo._createdAt >= :startAt
-          AND photo._createdAt < :endAt
+          AND pg._createdAt >= :startAt
+          AND pg._createdAt < :endAt
           AND EXISTS (
               SELECT member._id
               FROM GroupMember member
               WHERE member._group = pg._group
-                AND member._user = photo._uploader
+                AND member._user = uploader
                 AND member._deletedAt IS NULL
           )
         GROUP BY pg._group._id
         """,
     )
-    fun countTodayPhotoUploadersByGroupIds(
+    fun countPhotoUploadersByGroupIdsAndCreatedAtRange(
         @Param("groupIds")
         groupIds: List<Long>,
         @Param("startAt")
@@ -37,6 +38,30 @@ interface PhotoGroupRepository : JpaRepository<PhotoGroup, Long> {
         @Param("endAt")
         endAt: Instant,
     ): List<TodayPhotoUploaderCount>
+
+    @Query(
+        """
+        SELECT CASE WHEN COUNT(pg) > 0 THEN true ELSE false END
+        FROM PhotoGroup pg
+        JOIN pg._photo photo
+        JOIN photo._uploader uploader
+        WHERE uploader._id = :userId
+          AND pg._group._id IN :groupIds
+          AND pg._deletedAt IS NULL
+          AND pg._createdAt >= :startAt
+          AND pg._createdAt < :endAt
+        """,
+    )
+    fun existsUploadByUserIdAndGroupIdsAndCreatedAtRange(
+        @Param("userId")
+        userId: Long,
+        @Param("groupIds")
+        groupIds: List<Long>,
+        @Param("startAt")
+        startAt: Instant,
+        @Param("endAt")
+        endAt: Instant,
+    ): Boolean
 }
 
 data class TodayPhotoUploaderCount(

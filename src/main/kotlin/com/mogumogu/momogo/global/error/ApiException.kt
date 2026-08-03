@@ -60,4 +60,13 @@ sealed class ApiException(
         errorCode = errorCode,
         detail = detail,
     )
+
+    class UnprocessableEntity(
+        errorCode: ErrorCode,
+        detail: String = errorCode.message,
+    ) : ApiException(
+        status = HttpStatus.UNPROCESSABLE_CONTENT,
+        errorCode = errorCode,
+        detail = detail,
+    )
 }

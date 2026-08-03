@@ -63,10 +63,17 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         exception: DataIntegrityViolationException,
         request: HttpServletRequest,
     ): ProblemDetail {
-        if (exception.isDuplicateLoginAccount()) {
+        val errorCode = when {
+            exception.hasConstraint(PHOTO_OBJECT_KEY_UNIQUE_CONSTRAINT_PATTERN) ->
+                ErrorCode.PHOTO_ALREADY_REGISTERED
+            exception.hasConstraint(LOGIN_ACCOUNT_UNIQUE_CONSTRAINT_PATTERN) ->
+                ErrorCode.DUPLICATE_LOGIN_ACCOUNT
+            else -> null
+        }
+        if (errorCode != null) {
             return createProblemDetail(
                 status = HttpStatus.CONFLICT,
-                detail = ErrorCode.DUPLICATE_LOGIN_ACCOUNT.message,
+                detail = errorCode.message,
             )
         }
 
@@ -99,11 +106,11 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
             title = status.reasonPhrase
         }
 
-    private fun DataIntegrityViolationException.isDuplicateLoginAccount(): Boolean =
+    private fun DataIntegrityViolationException.hasConstraint(pattern: Regex): Boolean =
         generateSequence<Throwable>(this) { it.cause }
             .filterIsInstance<ConstraintViolationException>()
             .mapNotNull { it.constraintName }
-            .any(LOGIN_ACCOUNT_UNIQUE_CONSTRAINT_PATTERN::containsMatchIn)
+            .any(pattern::containsMatchIn)
 
     private fun logUnexpectedException(
         exception: Exception,
@@ -124,8 +131,14 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
 
     private companion object {
         const val LOGIN_ACCOUNT_UNIQUE_CONSTRAINT = "uk_login_account_provider_provider_id"
+        const val PHOTO_OBJECT_KEY_UNIQUE_CONSTRAINT = "uq_photo_object_key"
         val LOGIN_ACCOUNT_UNIQUE_CONSTRAINT_PATTERN = Regex(
-            pattern = """(?i)(?:^|[."`])$LOGIN_ACCOUNT_UNIQUE_CONSTRAINT(?:$|_INDEX_|["`\s])""",
+            constraintPattern(LOGIN_ACCOUNT_UNIQUE_CONSTRAINT),
         )
+        val PHOTO_OBJECT_KEY_UNIQUE_CONSTRAINT_PATTERN = Regex(
+            constraintPattern(PHOTO_OBJECT_KEY_UNIQUE_CONSTRAINT),
+        )
+        fun constraintPattern(constraintName: String): String =
+            """(?i)(?:^|[."`])$constraintName(?:$|_INDEX_|["`\s])"""
     }
 }

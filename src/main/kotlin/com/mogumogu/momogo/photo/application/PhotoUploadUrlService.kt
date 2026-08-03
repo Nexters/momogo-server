@@ -1,11 +1,11 @@
 package com.mogumogu.momogo.photo.application
 
+import com.mogumogu.momogo.global.config.ApplicationPhase
 import com.mogumogu.momogo.global.error.ApiException
 import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.photo.domain.PhotoContentType
 import com.mogumogu.momogo.photo.domain.PhotoObjectKey
 import com.mogumogu.momogo.user.infra.UserRepository
-import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -17,11 +17,9 @@ import java.util.UUID
 class PhotoUploadUrlService(
     private val userRepository: UserRepository,
     private val uploadUrlGenerator: PhotoUploadUrlGenerator,
-    environment: Environment,
+    private val applicationPhase: ApplicationPhase,
     private val clock: Clock,
 ) {
-
-    private val phase = environment.activeProfiles.first()
 
     @Transactional(readOnly = true)
     fun issue(
@@ -35,7 +33,7 @@ class PhotoUploadUrlService(
         val contentType = PhotoContentType.from(contentTypeValue)
             ?: throw ApiException.BadRequest(ErrorCode.INVALID_CONTENT_TYPE)
         val objectKey = PhotoObjectKey.generate(
-            phase = phase,
+            phase = applicationPhase.value,
             userId = userId,
             uploadDate = LocalDate.now(clock),
             objectId = UUID.randomUUID(),
@@ -43,12 +41,13 @@ class PhotoUploadUrlService(
         )
         val generated = uploadUrlGenerator.generate(
             objectKey = objectKey,
-            contentTypeValue = contentTypeValue,
+            contentType = contentType,
         )
 
         return PhotoUploadUrlResult(
             uploadUrl = generated.uploadUrl,
             objectKey = objectKey.value,
+            contentType = contentType.value,
             expiresAt = generated.expiresAt,
         )
     }
@@ -57,5 +56,6 @@ class PhotoUploadUrlService(
 data class PhotoUploadUrlResult(
     val uploadUrl: String,
     val objectKey: String,
+    val contentType: String,
     val expiresAt: LocalDateTime,
 )

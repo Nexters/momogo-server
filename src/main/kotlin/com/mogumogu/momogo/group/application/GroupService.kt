@@ -46,11 +46,12 @@ class GroupService(
             .associate { count -> count.groupId to count.totalMemberCount }
         val startAt = date.atStartOfDay(clock.zone).toInstant()
         val endAt = date.plusDays(1).atStartOfDay(clock.zone).toInstant()
-        val photoUploaderCountByGroupId = photoGroupRepository.countTodayPhotoUploadersByGroupIds(
-            groupIds = groupIds,
-            startAt = startAt,
-            endAt = endAt,
-        ).associate { count -> count.groupId to count.uploaderCount }
+        val photoUploaderCountByGroupId = photoGroupRepository
+            .countPhotoUploadersByGroupIdsAndCreatedAtRange(
+                groupIds = groupIds,
+                startAt = startAt,
+                endAt = endAt,
+            ).associate { count -> count.groupId to count.uploaderCount }
 
         return GetJoinedGroupsResult(
             date = date,

@@ -112,12 +112,15 @@ class PhotoUploadUrlApiIntegrationTest(
                 response.status shouldBe HttpStatus.OK.value()
                 response.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
                 val body = objectMapper.readTree(response.contentAsString)
-                body.propertyNames().toSet() shouldBe setOf("uploadUrl", "objectKey", "expiresAt")
+                body.propertyNames().toSet() shouldBe
+                    setOf("uploadUrl", "objectKey", "contentType", "expiresAt")
 
                 val objectKey = PhotoObjectKey.parse(body["objectKey"].stringValue())
                 objectKey.belongsTo("test", registeredUser.userId) shouldBe true
                 objectKey.uploadDate shouldBe LocalDate.now(clock)
                 objectKey.extension shouldBe "png"
+
+                body["contentType"].stringValue() shouldBe "image/png"
 
                 val uploadUrl = URI(body["uploadUrl"].stringValue())
                 uploadUrl.path shouldBe "/momogo-test/${objectKey.value}"

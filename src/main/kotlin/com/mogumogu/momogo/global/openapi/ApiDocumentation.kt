@@ -10,6 +10,7 @@ annotation class ApiErrors(
     val forbidden: Array<ErrorCode> = [],
     val notFound: Array<ErrorCode> = [],
     val conflict: Array<ErrorCode> = [],
+    val unprocessableEntity: Array<ErrorCode> = [],
     val internalServerError: Array<ErrorCode> = [],
 )
 
@@ -87,6 +88,14 @@ enum class OpenApiExample(
         summary = "사진 업로드 URL 발급 요청",
         value = mapOf(
             "contentType" to "image/webp",
+        ),
+    ),
+    PHOTO_CREATE_REQUEST(
+        componentName = "PhotoCreateRequestExample",
+        summary = "사진 등록 요청",
+        value = mapOf(
+            "objectKey" to "dev/users/1/2026-08-03/9f8b3a1c-2d4e-4a6b-8c0d-123456789abc.webp",
+            "groupIds" to listOf(10, 20),
         ),
     ),
     AUTH_RESPONSE(
@@ -184,7 +193,17 @@ enum class OpenApiExample(
         value = mapOf(
             "uploadUrl" to "https://example.r2.cloudflarestorage.com/momogo-dev/dev/users/1/2026-08-03/9f8b3a1c-2d4e-4a6b-8c0d-123456789abc.webp?X-Amz-Signature=example",
             "objectKey" to "dev/users/1/2026-08-03/9f8b3a1c-2d4e-4a6b-8c0d-123456789abc.webp",
+            "contentType" to "image/webp",
             "expiresAt" to "2026-08-03T18:15:00",
+        ),
+    ),
+    PHOTO_CREATE_RESPONSE(
+        componentName = "PhotoCreateResponseExample",
+        summary = "사진 등록 성공 응답",
+        value = mapOf(
+            "photoId" to 501,
+            "objectKey" to "dev/users/1/2026-08-03/9f8b3a1c-2d4e-4a6b-8c0d-123456789abc.webp",
+            "createdAt" to "2026-08-03T14:30:00.123456",
         ),
     ),
     APP_VERSION_RESPONSE(
