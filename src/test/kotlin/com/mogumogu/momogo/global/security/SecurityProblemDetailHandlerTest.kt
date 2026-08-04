@@ -5,6 +5,8 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
 import org.springframework.http.MediaType
+import org.springframework.http.ProblemDetail
+import org.springframework.http.converter.json.ProblemDetailJacksonMixin
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.access.AccessDeniedException
@@ -13,7 +15,10 @@ import tools.jackson.databind.json.JsonMapper
 
 class SecurityProblemDetailHandlerTest : BehaviorSpec({
 
-    val objectMapper = JsonMapper.builder().build()
+    val objectMapper = JsonMapper
+        .builder()
+        .addMixIn(ProblemDetail::class.java, ProblemDetailJacksonMixin::class.java)
+        .build()
     val writer = SecurityProblemDetailWriter(objectMapper)
 
     given("인증에 실패하면") {
@@ -36,6 +41,7 @@ class SecurityProblemDetailHandlerTest : BehaviorSpec({
                 body["status"].intValue() shouldBe 401
                 body["title"].stringValue() shouldBe "Unauthorized"
                 body["detail"].stringValue() shouldBe ErrorCode.INVALID_AUTH_CREDENTIALS.message
+                body["code"].stringValue() shouldBe ErrorCode.INVALID_AUTH_CREDENTIALS.name
                 body["instance"].stringValue() shouldBe "/api/v1/user"
                 response.contentAsString shouldNotContain "raw-token-and-parser-detail"
             }
@@ -62,6 +68,7 @@ class SecurityProblemDetailHandlerTest : BehaviorSpec({
                 body["status"].intValue() shouldBe 403
                 body["title"].stringValue() shouldBe "Forbidden"
                 body["detail"].stringValue() shouldBe ErrorCode.FORBIDDEN.message
+                body["code"].stringValue() shouldBe ErrorCode.FORBIDDEN.name
                 body["instance"].stringValue() shouldBe "/admin"
                 response.contentAsString shouldNotContain "sensitive-authorization-detail"
             }

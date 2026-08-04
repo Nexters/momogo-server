@@ -24,7 +24,7 @@ class ProblemDetailAuthenticationEntryPoint(
             request = request,
             response = response,
             status = HttpStatus.UNAUTHORIZED,
-            detail = ErrorCode.INVALID_AUTH_CREDENTIALS.message,
+            errorCode = ErrorCode.INVALID_AUTH_CREDENTIALS,
         )
     }
 }

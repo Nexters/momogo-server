@@ -25,7 +25,7 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
     ): ResponseEntity<Any>? {
         val problemDetail = createProblemDetail(
             status = HttpStatus.BAD_REQUEST,
-            detail = ErrorCode.INVALID_REQUEST.message,
+            errorCode = ErrorCode.INVALID_REQUEST,
         )
 
         problemDetail.setProperty(
@@ -51,7 +51,7 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
             ex,
             createProblemDetail(
                 status = HttpStatus.BAD_REQUEST,
-                detail = ErrorCode.INVALID_REQUEST.message,
+                errorCode = ErrorCode.INVALID_REQUEST,
             ),
             headers,
             HttpStatus.BAD_REQUEST,
@@ -73,7 +73,7 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         if (errorCode != null) {
             return createProblemDetail(
                 status = HttpStatus.CONFLICT,
-                detail = errorCode.message,
+                errorCode = errorCode,
             )
         }
 
@@ -81,7 +81,7 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
 
         return createProblemDetail(
             status = HttpStatus.INTERNAL_SERVER_ERROR,
-            detail = ErrorCode.INTERNAL_SERVER_ERROR.message,
+            errorCode = ErrorCode.INTERNAL_SERVER_ERROR,
         )
     }
 
@@ -94,16 +94,17 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
 
         return createProblemDetail(
             status = HttpStatus.INTERNAL_SERVER_ERROR,
-            detail = ErrorCode.INTERNAL_SERVER_ERROR.message,
+            errorCode = ErrorCode.INTERNAL_SERVER_ERROR,
         )
     }
 
     private fun createProblemDetail(
         status: HttpStatus,
-        detail: String,
+        errorCode: ErrorCode,
     ): ProblemDetail =
-        ProblemDetail.forStatusAndDetail(status, detail).apply {
+        ProblemDetail.forStatusAndDetail(status, errorCode.message).apply {
             title = status.reasonPhrase
+            withErrorCode(errorCode)
         }
 
     private fun DataIntegrityViolationException.hasConstraint(pattern: Regex): Boolean =

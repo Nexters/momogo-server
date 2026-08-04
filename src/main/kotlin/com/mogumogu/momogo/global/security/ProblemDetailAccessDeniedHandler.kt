@@ -22,7 +22,7 @@ class ProblemDetailAccessDeniedHandler(
             request = request,
             response = response,
             status = HttpStatus.FORBIDDEN,
-            detail = ErrorCode.FORBIDDEN.message,
+            errorCode = ErrorCode.FORBIDDEN,
         )
     }
 }

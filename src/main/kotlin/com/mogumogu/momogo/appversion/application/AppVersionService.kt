@@ -21,7 +21,7 @@ class AppVersionService(
         appVersionValue: String,
     ): AppVersionCheckResult {
         val platform = AppPlatform.from(platformValue)
-            ?: throw invalidPlatformException()
+            ?: throw ApiException.BadRequest(ErrorCode.INVALID_PLATFORM)
         val appVersion = SemanticVersion.parseOrNull(appVersionValue)
             ?: throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
         val policy = policies.getValue(platform)
@@ -56,11 +56,6 @@ class AppVersionService(
             updateUrl = updateUrl.toString(),
         )
     }
-
-    private fun invalidPlatformException(): ApiException.BadRequest =
-        ApiException.BadRequest(ErrorCode.INVALID_PLATFORM).apply {
-            body.setProperty("code", errorCode.name)
-        }
 
     private data class AppVersionPolicy(
         val latestVersionValue: String,

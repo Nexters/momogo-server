@@ -1,5 +1,6 @@
 package com.mogumogu.momogo.group.presentation
 
+import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.group.domain.Group
 import com.mogumogu.momogo.group.domain.GroupMember
 import com.mogumogu.momogo.group.domain.InviteCode
@@ -253,13 +254,14 @@ class GroupApiIntegrationTest(
     fun assertProblem(
         response: MockHttpServletResponse,
         status: HttpStatus,
-        detail: String,
+        errorCode: ErrorCode,
     ) {
         response.status shouldBe status.value()
         response.contentType shouldBe MediaType.APPLICATION_PROBLEM_JSON_VALUE
         val body = objectMapper.readTree(response.contentAsString)
         body["status"].intValue() shouldBe status.value()
-        body["detail"].stringValue() shouldBe detail
+        body["detail"].stringValue() shouldBe errorCode.message
+        body["code"].stringValue() shouldBe errorCode.name
     }
 
     given("현재 사용자가 참여 중인 그룹과 오늘 등록된 그룹 사진이 있으면") {
@@ -445,7 +447,7 @@ class GroupApiIntegrationTest(
                     assertProblem(
                         response = response,
                         status = HttpStatus.BAD_REQUEST,
-                        detail = "요청 값이 올바르지 않습니다.",
+                        errorCode = ErrorCode.INVALID_REQUEST,
                     )
                 }
                 groupRepository.count() shouldBe 0L
@@ -514,7 +516,7 @@ class GroupApiIntegrationTest(
                     assertProblem(
                         response = response,
                         status = HttpStatus.FORBIDDEN,
-                        detail = "그룹 멤버가 아닙니다.",
+                        errorCode = ErrorCode.NOT_GROUP_MEMBER,
                     )
                 }
                 groupRepository.findById(requireNotNull(group.id)).orElseThrow().name shouldBe
@@ -536,7 +538,7 @@ class GroupApiIntegrationTest(
                         name = "찾을 수 없는 그룹",
                     ),
                     status = HttpStatus.NOT_FOUND,
-                    detail = "그룹을 찾을 수 없습니다.",
+                    errorCode = ErrorCode.GROUP_NOT_FOUND,
                 )
             }
         }
@@ -562,7 +564,7 @@ class GroupApiIntegrationTest(
                     assertProblem(
                         response = response,
                         status = HttpStatus.BAD_REQUEST,
-                        detail = "요청 값이 올바르지 않습니다.",
+                        errorCode = ErrorCode.INVALID_REQUEST,
                     )
                 }
                 groupRepository.findById(groupId).orElseThrow().name shouldBe "유지할 그룹명"
@@ -586,7 +588,7 @@ class GroupApiIntegrationTest(
                         name = "변경할 수 없는 그룹",
                     ),
                     status = HttpStatus.UNAUTHORIZED,
-                    detail = "인증 정보가 올바르지 않습니다.",
+                    errorCode = ErrorCode.INVALID_AUTH_CREDENTIALS,
                 )
                 groupRepository.findById(requireNotNull(group.id)).orElseThrow().name shouldBe
                     "인증 필요 그룹"
@@ -602,7 +604,7 @@ class GroupApiIntegrationTest(
                 assertProblem(
                     response = createGroup(null, "인증 없는 그룹"),
                     status = HttpStatus.UNAUTHORIZED,
-                    detail = "인증 정보가 올바르지 않습니다.",
+                    errorCode = ErrorCode.INVALID_AUTH_CREDENTIALS,
                 )
                 groupRepository.count() shouldBe 0L
                 groupMemberRepository.count() shouldBe 0L
@@ -631,7 +633,7 @@ class GroupApiIntegrationTest(
                     assertProblem(
                         response = response,
                         status = HttpStatus.NOT_FOUND,
-                        detail = "사용자를 찾을 수 없습니다.",
+                        errorCode = ErrorCode.USER_NOT_FOUND,
                     )
                 }
                 groupRepository.count() shouldBe 1L
@@ -678,7 +680,7 @@ class GroupApiIntegrationTest(
                         assertProblem(
                             response = joinResponse,
                             status = HttpStatus.NOT_FOUND,
-                            detail = "사용자를 찾을 수 없습니다.",
+                            errorCode = ErrorCode.USER_NOT_FOUND,
                         )
                     }
                     userRepository.existsById(targetUserId) shouldBe false
@@ -762,7 +764,7 @@ class GroupApiIntegrationTest(
                         assertProblem(
                             response = response,
                             status = HttpStatus.NOT_FOUND,
-                            detail = "유효하지 않은 초대 코드입니다.",
+                            errorCode = ErrorCode.INVALID_INVITATION_CODE,
                         )
                     }
                 }
@@ -820,7 +822,7 @@ class GroupApiIntegrationTest(
                         code = "JOIN02",
                     ),
                     status = HttpStatus.CONFLICT,
-                    detail = "이미 그룹에 가입되어 있습니다.",
+                    errorCode = ErrorCode.ALREADY_JOINED,
                 )
 
                 groupMemberRepository.count() shouldBe 1L
@@ -891,7 +893,7 @@ class GroupApiIntegrationTest(
                         code = "FULL08",
                     ),
                     status = HttpStatus.CONFLICT,
-                    detail = "그룹의 최대 인원을 초과했습니다.",
+                    errorCode = ErrorCode.GROUP_FULL,
                 )
 
                 groupMemberRepository.countJoinedByGroupId(requireNotNull(group.id)) shouldBe 8L
@@ -936,7 +938,7 @@ class GroupApiIntegrationTest(
                         assertProblem(
                             response = response,
                             status = HttpStatus.CONFLICT,
-                            detail = "이미 그룹에 가입되어 있습니다.",
+                            errorCode = ErrorCode.ALREADY_JOINED,
                         )
                     }
                     groupMemberRepository.count() shouldBe 1L
@@ -1016,7 +1018,7 @@ class GroupApiIntegrationTest(
                     assertProblem(
                         response = unavailableGroupResponse,
                         status = HttpStatus.NOT_FOUND,
-                        detail = "유효하지 않은 초대 코드입니다.",
+                        errorCode = ErrorCode.INVALID_INVITATION_CODE,
                     )
                 }
                 assertProblem(
@@ -1026,7 +1028,7 @@ class GroupApiIntegrationTest(
                         name = "변경할 수 없는 그룹",
                     ),
                     status = HttpStatus.NOT_FOUND,
-                    detail = "그룹을 찾을 수 없습니다.",
+                    errorCode = ErrorCode.GROUP_NOT_FOUND,
                 )
             }
         }
@@ -1079,7 +1081,7 @@ class GroupApiIntegrationTest(
                         assertProblem(
                             response = joinResponse,
                             status = HttpStatus.NOT_FOUND,
-                            detail = "유효하지 않은 초대 코드입니다.",
+                            errorCode = ErrorCode.INVALID_INVITATION_CODE,
                         )
                         savedGroup.isActive() shouldBe false
                         groupMemberRepository.countJoinedByGroupId(groupId) shouldBe 0L
@@ -1103,7 +1105,7 @@ class GroupApiIntegrationTest(
                         groupId = Long.MAX_VALUE,
                     ),
                     status = HttpStatus.NOT_FOUND,
-                    detail = "그룹을 찾을 수 없습니다.",
+                    errorCode = ErrorCode.GROUP_NOT_FOUND,
                 )
             }
         }
@@ -1134,7 +1136,7 @@ class GroupApiIntegrationTest(
                             groupId = requireNotNull(group.id),
                         ),
                         status = HttpStatus.NOT_FOUND,
-                        detail = "그룹 멤버를 찾을 수 없습니다.",
+                        errorCode = ErrorCode.MEMBER_NOT_FOUND,
                     )
                 }
 
@@ -1158,7 +1160,7 @@ class GroupApiIntegrationTest(
                     assertProblem(
                         response = response,
                         status = HttpStatus.UNAUTHORIZED,
-                        detail = "인증 정보가 올바르지 않습니다.",
+                        errorCode = ErrorCode.INVALID_AUTH_CREDENTIALS,
                     )
                 }
                 groupMemberRepository.count() shouldBe 0L

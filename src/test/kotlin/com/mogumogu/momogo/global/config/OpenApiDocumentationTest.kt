@@ -820,9 +820,5 @@ private fun JsonNode.shouldBeProblemExample(
     this["value"]["title"].stringValue() shouldBe status.reasonPhrase
     this["value"]["status"].intValue() shouldBe status.value()
     this["value"]["detail"].stringValue() shouldBe errorCode.message
-    if (errorCode == ErrorCode.INVALID_PLATFORM) {
-        this["value"]["code"].stringValue() shouldBe errorCode.name
-    } else {
-        this["value"].has("code") shouldBe false
-    }
+    this["value"]["code"].stringValue() shouldBe errorCode.name
 }

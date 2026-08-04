@@ -63,7 +63,7 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
                 body["status"].intValue() shouldBe 404
                 body["detail"].stringValue() shouldBe "요청한 리소스를 찾을 수 없습니다."
                 body["instance"].stringValue() shouldBe "/test/api-exception"
-                body.has("code") shouldBe false
+                body["code"].stringValue() shouldBe ErrorCode.RESOURCE_NOT_FOUND.name
             }
         }
     }
@@ -83,7 +83,7 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
                 body["errors"][0]["field"].stringValue() shouldBe "name"
                 body["errors"][0]["message"].stringValue() shouldBe "이름은 비어 있을 수 없습니다."
                 body["instance"].stringValue() shouldBe "/test/validation"
-                body.has("code") shouldBe false
+                body["code"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.name
             }
         }
     }
@@ -103,7 +103,7 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
                 body["status"].intValue() shouldBe 400
                 body["detail"].stringValue() shouldBe "요청 값이 올바르지 않습니다."
                 body["instance"].stringValue() shouldBe "/test/validation"
-                body.has("code") shouldBe false
+                body["code"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.name
             }
         }
 
@@ -195,7 +195,7 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
                 response.contentType shouldBe MediaType.APPLICATION_PROBLEM_JSON_VALUE
                 body["detail"].stringValue() shouldBe "서버 내부 오류가 발생했습니다."
                 body["instance"].stringValue() shouldBe "/test/illegal-argument"
-                body.has("code") shouldBe false
+                body["code"].stringValue() shouldBe ErrorCode.INTERNAL_SERVER_ERROR.name
             }
         }
     }

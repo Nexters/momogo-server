@@ -51,6 +51,7 @@ class SecurityFilterChainTest(
                 response.getHeader(HttpHeaders.WWW_AUTHENTICATE) shouldBe "Bearer"
                 body["status"].intValue() shouldBe 401
                 body["detail"].stringValue() shouldBe ErrorCode.INVALID_AUTH_CREDENTIALS.message
+                body["code"].stringValue() shouldBe ErrorCode.INVALID_AUTH_CREDENTIALS.name
                 body["instance"].stringValue() shouldBe "/api/v1/user"
                 result.request.getSession(false) shouldBe null
             }

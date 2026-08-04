@@ -1,5 +1,7 @@
 package com.mogumogu.momogo.global.security
 
+import com.mogumogu.momogo.global.error.ErrorCode
+import com.mogumogu.momogo.global.error.withErrorCode
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpStatus
@@ -18,13 +20,14 @@ class SecurityProblemDetailWriter(
         request: HttpServletRequest,
         response: HttpServletResponse,
         status: HttpStatus,
-        detail: String,
+        errorCode: ErrorCode,
     ) {
         val problemDetail = ProblemDetail
-            .forStatusAndDetail(status, detail)
+            .forStatusAndDetail(status, errorCode.message)
             .apply {
                 title = status.reasonPhrase
                 instance = URI.create(request.requestURI)
+                withErrorCode(errorCode)
             }
 
         response.status = status.value()
