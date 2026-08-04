@@ -325,8 +325,8 @@ class AuthUserApiIntegrationTest(
                 ).forEach { changedToken ->
                     assertProblem(
                         response = login(changedToken),
-                        status = HttpStatus.UNAUTHORIZED,
-                        detail = "인증 정보가 올바르지 않습니다.",
+                        status = HttpStatus.NOT_FOUND,
+                        detail = "사용자를 찾을 수 없습니다.",
                     )
                 }
             }
@@ -400,13 +400,13 @@ class AuthUserApiIntegrationTest(
 
     given("등록되지 않은 Guest 로그인 정보가 있으면") {
         `when`("로그인을 요청할 때") {
-            then("401 ProblemDetail을 반환한다") {
+            then("액세스 토큰 문제와 구분되도록 404 ProblemDetail을 반환한다") {
                 cleanDatabase()
 
                 assertProblem(
                     response = login("unknown-guest"),
-                    status = HttpStatus.UNAUTHORIZED,
-                    detail = "인증 정보가 올바르지 않습니다.",
+                    status = HttpStatus.NOT_FOUND,
+                    detail = "사용자를 찾을 수 없습니다.",
                 )
             }
         }
@@ -604,14 +604,14 @@ class AuthUserApiIntegrationTest(
 
                 assertProblem(
                     response = reissue(oldRefreshToken),
-                    status = HttpStatus.UNAUTHORIZED,
+                    status = HttpStatus.NOT_FOUND,
                     detail = "유효하지 않은 리프레시 토큰입니다.",
                 )
             }
         }
 
         `when`("같은 refresh token으로 동시에 두 번 재발급할 때") {
-            then("DB 잠금으로 하나만 성공하고 다른 요청은 401이 된다") {
+            then("DB 잠금으로 하나만 성공하고 다른 요청은 404가 된다") {
                 cleanDatabase()
                 val registerBody = objectMapper.readTree(
                     register("concurrent-rotation-guest").contentAsString,
@@ -624,7 +624,7 @@ class AuthUserApiIntegrationTest(
 
                 responses.map { it.status }.sorted() shouldContainExactly listOf(
                     HttpStatus.OK.value(),
-                    HttpStatus.UNAUTHORIZED.value(),
+                    HttpStatus.NOT_FOUND.value(),
                 )
                 val savedTokens = refreshTokenRepository.findAll()
                 savedTokens.size shouldBe 2
@@ -656,7 +656,7 @@ class AuthUserApiIntegrationTest(
 
                 assertProblem(
                     response = reissue(expiredRawToken),
-                    status = HttpStatus.UNAUTHORIZED,
+                    status = HttpStatus.NOT_FOUND,
                     detail = "유효하지 않은 리프레시 토큰입니다.",
                 )
                 listOf(
@@ -672,7 +672,7 @@ class AuthUserApiIntegrationTest(
                 assertJsonResponse(updateNickname(accessToken, "로그아웃 후"))
                 assertProblem(
                     response = reissue(refreshToken),
-                    status = HttpStatus.UNAUTHORIZED,
+                    status = HttpStatus.NOT_FOUND,
                     detail = "유효하지 않은 리프레시 토큰입니다.",
                 )
             }
@@ -747,7 +747,7 @@ class AuthUserApiIntegrationTest(
                 )
                 assertProblem(
                     response = reissue(refreshToken),
-                    status = HttpStatus.UNAUTHORIZED,
+                    status = HttpStatus.NOT_FOUND,
                     detail = "유효하지 않은 리프레시 토큰입니다.",
                 )
             }
@@ -774,12 +774,12 @@ class AuthUserApiIntegrationTest(
                 assertJsonResponse(withdrawResponse)
                 (reissueResponse.status in setOf(
                     HttpStatus.OK.value(),
-                    HttpStatus.UNAUTHORIZED.value(),
+                    HttpStatus.NOT_FOUND.value(),
                 )) shouldBe true
-                if (reissueResponse.status == HttpStatus.UNAUTHORIZED.value()) {
+                if (reissueResponse.status == HttpStatus.NOT_FOUND.value()) {
                     assertProblem(
                         response = reissueResponse,
-                        status = HttpStatus.UNAUTHORIZED,
+                        status = HttpStatus.NOT_FOUND,
                         detail = "유효하지 않은 리프레시 토큰입니다.",
                     )
                 }
