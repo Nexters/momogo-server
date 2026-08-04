@@ -36,8 +36,6 @@ import tools.jackson.databind.ObjectMapper
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -234,24 +232,20 @@ class GroupApiIntegrationTest(
             ),
         )
         photoGroupRepository.saveAndFlush(
-            PhotoGroup(
-                _photo = photo,
-                _group = group,
-            ).apply {
+            PhotoGroup(_photo = photo, _group = group).apply {
                 unlinkedAt?.let(::unlink)
             },
         )
         return photo
     }
 
-    fun movePhotoCreatedAt(
+    fun movePhotoGroupCreatedAt(
         photo: Photo,
         createdAt: Instant,
     ) {
         jdbcTemplate.update(
-            "UPDATE photo SET created_at = ?, updated_at = ? WHERE id = ?",
-            OffsetDateTime.ofInstant(createdAt, ZoneOffset.UTC),
-            OffsetDateTime.ofInstant(createdAt, ZoneOffset.UTC),
+            "UPDATE photo_group SET created_at = ? WHERE photo_id = ?",
+            createdAt,
             requireNotNull(photo.id),
         )
     }
@@ -273,6 +267,7 @@ class GroupApiIntegrationTest(
             then("활성 그룹별 현재 멤버 수와 오늘 사진을 올린 멤버 수를 반환한다") {
                 cleanDatabase()
                 val requestingUser = registerUser("joined-group-list-requester")
+                val withdrawnUploader = registerUser("joined-group-list-withdrawn-uploader")
                 val firstUploader = userRepository.saveAndFlush(User(_nickname = "첫 번째 업로더"))
                 val secondUploader = userRepository.saveAndFlush(User(_nickname = "두 번째 업로더"))
                 val previousDayUploader = userRepository.saveAndFlush(User(_nickname = "어제 업로더"))
@@ -283,7 +278,13 @@ class GroupApiIntegrationTest(
                     code = "LIST01",
                 )
                 saveMember(groupWithPhotos, requestingUser.user)
-                listOf(firstUploader, secondUploader, previousDayUploader, unlinkedUploader)
+                listOf(
+                    firstUploader,
+                    secondUploader,
+                    previousDayUploader,
+                    unlinkedUploader,
+                    withdrawnUploader.user,
+                )
                     .forEach { user -> saveMember(groupWithPhotos, user) }
                 saveMember(
                     group = groupWithPhotos,
@@ -297,12 +298,12 @@ class GroupApiIntegrationTest(
                 listOf(
                     savePhoto(firstUploader, groupWithPhotos, "photos/list-first.jpg"),
                     savePhoto(secondUploader, groupWithPhotos, "photos/list-second.jpg"),
-                ).forEach { photo -> movePhotoCreatedAt(photo, todayAtNoon) }
-                movePhotoCreatedAt(
+                ).forEach { photo -> movePhotoGroupCreatedAt(photo, todayAtNoon) }
+                movePhotoGroupCreatedAt(
                     savePhoto(previousDayUploader, groupWithPhotos, "photos/list-previous.jpg"),
                     previousDayAtNoon,
                 )
-                movePhotoCreatedAt(
+                movePhotoGroupCreatedAt(
                     savePhoto(
                         uploader = unlinkedUploader,
                         group = groupWithPhotos,
@@ -311,10 +312,19 @@ class GroupApiIntegrationTest(
                     ),
                     todayAtNoon,
                 )
-                movePhotoCreatedAt(
+                movePhotoGroupCreatedAt(
                     savePhoto(leftUploader, groupWithPhotos, "photos/list-left.jpg"),
                     todayAtNoon,
                 )
+                movePhotoGroupCreatedAt(
+                    savePhoto(
+                        withdrawnUploader.user,
+                        groupWithPhotos,
+                        "photos/list-withdrawn.jpg",
+                    ),
+                    todayAtNoon,
+                )
+                withdraw(withdrawnUploader.accessToken).status shouldBe HttpStatus.OK.value()
 
                 val groupWithoutPhotos = saveGroup(
                     name = "오늘 사진이 없는 그룹",

@@ -72,6 +72,22 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
 
     @Query(
         """
+        SELECT gm._group._id
+        FROM GroupMember gm
+        WHERE gm._user._id = :userId
+          AND gm._group._id IN :groupIds
+          AND gm._deletedAt IS NULL
+        """,
+    )
+    fun findJoinedGroupIdsByUserIdAndGroupIds(
+        @Param("userId")
+        userId: Long,
+        @Param("groupIds")
+        groupIds: List<Long>,
+    ): List<Long>
+
+    @Query(
+        """
         SELECT COUNT(gm)
         FROM GroupMember gm
         WHERE gm._group._id = :groupId

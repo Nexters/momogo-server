@@ -27,16 +27,16 @@ class R2PhotoUploadUrlGeneratorTest(
 
     given("사진 오브젝트 키와 이미지 MIME 타입이 있으면") {
         `when`("R2 업로드 URL을 생성할 때") {
+            val contentType = requireNotNull(PhotoContentType.from("IMAGE/PNG"))
             val objectKey = PhotoObjectKey.generate(
                 phase = "test",
                 userId = 1L,
                 uploadDate = LocalDate.of(2026, 8, 3),
                 objectId = UUID.fromString("9f8b3a1c-2d4e-4a6b-8c0d-123456789abc"),
-                contentType = requireNotNull(PhotoContentType.from("image/png")),
+                contentType = contentType,
             )
-            val contentTypeValue = "IMAGE/PNG"
             val issuedAtEarliest = LocalDateTime.now(clock)
-            val result = generator.generate(objectKey, contentTypeValue)
+            val result = generator.generate(objectKey, contentType)
             val issuedAtLatest = LocalDateTime.now(clock)
             val uri = URI(result.uploadUrl)
             val queryParameters = uri.queryParameters()

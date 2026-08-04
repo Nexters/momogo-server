@@ -9,6 +9,7 @@ import jakarta.persistence.ForeignKey
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.Index
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
@@ -18,6 +19,12 @@ import java.time.Instant
 @Entity
 @Table(
     name = "photo_group",
+    indexes = [
+        Index(
+            name = "idx_photo_group_group_created_at_photo",
+            columnList = "group_id, created_at, photo_id",
+        ),
+    ],
     uniqueConstraints = [
         UniqueConstraint(
             name = "uq_photo_group_photo_group",

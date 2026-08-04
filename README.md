@@ -39,7 +39,11 @@ local 프로필의 endpoint와 인증 정보 기본값은 애플리케이션 실
 
 R2 API token은 각 환경의 버킷만 읽고 쓸 수 있도록 범위를 제한하며 실제 인증 정보는 저장소에 커밋하지 않는다. 참고: [Cloudflare R2 S3 API](https://developers.cloudflare.com/r2/api/s3/api/)
 
-클라이언트는 발급 요청에 사용한 이미지 `Content-Type` 값을 대소문자까지 그대로 지정해 presigned URL로 PUT해야 한다. 버킷의 public access는 필요하지 않으며, 브라우저에서 직접 업로드한다면 R2 버킷 CORS에서 사용하는 origin, PUT 메서드와 `Content-Type` 헤더를 별도로 허용해야 한다.
+발급 요청의 `Content-Type`은 대소문자를 가리지 않지만, 서명에는 소문자로 정규화한 값을 쓴다. 클라이언트는 응답의 `contentType` 값을 그대로 `Content-Type` 헤더에 지정해 presigned URL로 PUT해야 한다. 버킷의 public access는 필요하지 않으며, 브라우저에서 직접 업로드한다면 R2 버킷 CORS에서 사용하는 origin, PUT 메서드와 `Content-Type` 헤더를 별도로 허용해야 한다.
+
+R2 업로드가 끝나면 `POST /api/v1/photos`에 `objectKey`와 사진을 공유할 `groupIds`를 전달한다. 한 사용자는 그룹별로 하루에 사진 한 장만 등록할 수 있으며, 한 사진을 여러 그룹에 등록하면 선택한 각 그룹의 오늘 업로드를 모두 사용한다. 선택한 그룹 중 하나라도 오늘 업로드를 사용했으면 요청 전체를 거절한다. 그룹에서 사진을 내리면 그 그룹의 오늘 업로드는 다시 사용할 수 있다.
+
+dev와 prod는 Hibernate가 DB 스키마를 자동 변경하지 않고 검증만 하므로, 엔티티 변경에 필요한 DDL은 배포 전에 대상 DB에 직접 적용해야 한다.
 
 ## Docker Compose 배포
 

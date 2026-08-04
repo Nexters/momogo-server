@@ -712,10 +712,7 @@ class AuthUserApiIntegrationTest(
                 )
                 val photoId = requireNotNull(photo.id)
                 val photoGroup = photoGroupRepository.saveAndFlush(
-                    PhotoGroup(
-                        _photo = photo,
-                        _group = group,
-                    ),
+                    PhotoGroup(_photo = photo, _group = group),
                 )
                 val photoGroupId = requireNotNull(photoGroup.id)
 
@@ -740,6 +737,7 @@ class AuthUserApiIntegrationTest(
                     val remainingPhotoGroup = photoGroupRepository.findById(photoGroupId).orElseThrow()
                     remainingPhotoGroup.photo.id shouldBe photoId
                     remainingPhotoGroup.group.id shouldBe group.id
+                    remainingPhotoGroup.photo.uploader shouldBe null
                 }
 
                 assertProblem(

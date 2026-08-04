@@ -179,6 +179,7 @@ class OpenApiConfiguration(
             HttpStatus.FORBIDDEN to forbidden.toList(),
             HttpStatus.NOT_FOUND to notFound.toList(),
             HttpStatus.CONFLICT to conflict.toList(),
+            HttpStatus.UNPROCESSABLE_CONTENT to unprocessableEntity.toList(),
             HttpStatus.INTERNAL_SERVER_ERROR to internalServerError.toList(),
         ).filter { (_, errorCodes) -> errorCodes.isNotEmpty() }
 

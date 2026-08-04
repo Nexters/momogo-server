@@ -70,6 +70,7 @@ class OpenApiDocumentationTest(
                     .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/photos/upload-urls", "post")
                     .requiresBearerAuth() shouldBe true
+                document.operation("/api/v1/photos", "post").requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/user/register", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/login", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/reissue", "post").requiresBearerAuth() shouldBe false
@@ -103,6 +104,10 @@ class OpenApiDocumentationTest(
                 )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
                 document.operation(
                     "/api/v1/photos/upload-urls",
+                    "post",
+                )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
+                document.operation(
+                    "/api/v1/photos",
                     "post",
                 )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
 
@@ -141,6 +146,8 @@ class OpenApiDocumentationTest(
                     .hasParameter("userId") shouldBe false
                 document.operation("/api/v1/photos/upload-urls", "post")
                     .hasParameter("userId") shouldBe false
+                document.operation("/api/v1/photos", "post")
+                    .hasParameter("userId") shouldBe false
             }
 
             then("user, auth, group과 photo API의 설명과 주요 응답을 제공한다") {
@@ -161,6 +168,7 @@ class OpenApiDocumentationTest(
                     "delete",
                 )
                 val issuePhotoUploadUrl = document.operation("/api/v1/photos/upload-urls", "post")
+                val createPhoto = document.operation("/api/v1/photos", "post")
                 val checkAppVersion = document.operation("/init/versions", "get")
 
                 register["summary"].stringValue() shouldBe "회원가입"
@@ -212,6 +220,15 @@ class OpenApiDocumentationTest(
                 issuePhotoUploadUrl.hasResponseMediaType("200", "application/json") shouldBe true
                 issuePhotoUploadUrl.hasResponseMediaType("400", "application/problem+json") shouldBe true
                 issuePhotoUploadUrl.hasResponseMediaType("404", "application/problem+json") shouldBe true
+                createPhoto["summary"].stringValue() shouldBe "사진 등록"
+                createPhoto.responseCodes() shouldBe
+                    setOf("200", "400", "401", "403", "404", "409", "422")
+                createPhoto.hasResponseMediaType("200", "application/json") shouldBe true
+                createPhoto.hasResponseMediaType("400", "application/problem+json") shouldBe true
+                createPhoto.hasResponseMediaType("403", "application/problem+json") shouldBe true
+                createPhoto.hasResponseMediaType("404", "application/problem+json") shouldBe true
+                createPhoto.hasResponseMediaType("409", "application/problem+json") shouldBe true
+                createPhoto.hasResponseMediaType("422", "application/problem+json") shouldBe true
                 checkAppVersion["summary"].stringValue() shouldBe "앱 버전 체크"
                 checkAppVersion.responseCodes() shouldBe setOf("200", "400")
                 checkAppVersion.hasResponseMediaType("200", "application/json") shouldBe true
@@ -352,11 +369,30 @@ class OpenApiDocumentationTest(
                 val issuePhotoUploadUrl = document.operation("/api/v1/photos/upload-urls", "post")
                 val photoUploadUrlSchema = document.responseSchema(issuePhotoUploadUrl, "200")
                 photoUploadUrlSchema["required"].stringValues().toSet() shouldBe
-                    setOf("uploadUrl", "objectKey", "expiresAt")
+                    setOf("uploadUrl", "objectKey", "contentType", "expiresAt")
                 photoUploadUrlSchema["properties"].propertyNames().asSequence().toSet() shouldBe
-                    setOf("uploadUrl", "objectKey", "expiresAt")
+                    setOf("uploadUrl", "objectKey", "contentType", "expiresAt")
                 photoUploadUrlSchema["properties"]["expiresAt"]["type"].stringValue() shouldBe "string"
                 photoUploadUrlSchema["properties"]["expiresAt"]["format"].stringValue() shouldBe
+                    "date-time"
+
+                schemas["PhotoCreateRequest"]["required"].stringValues().toSet() shouldBe
+                    setOf("objectKey", "groupIds")
+                schemas["PhotoCreateRequest"]["properties"]["objectKey"]["maxLength"]
+                    .intValue() shouldBe 512
+                schemas["PhotoCreateRequest"]["properties"]["groupIds"]["type"]
+                    .stringValue() shouldBe "array"
+                schemas["PhotoCreateRequest"]["properties"]["groupIds"]["maxItems"]
+                    .intValue() shouldBe 20
+                val createPhoto = document.operation("/api/v1/photos", "post")
+                val photoCreateSchema = document.responseSchema(createPhoto, "200")
+                photoCreateSchema["required"].stringValues().toSet() shouldBe
+                    setOf("photoId", "objectKey", "createdAt")
+                photoCreateSchema["properties"].propertyNames().asSequence().toSet() shouldBe
+                    setOf("photoId", "objectKey", "createdAt")
+                photoCreateSchema["properties"]["createdAt"]["type"].stringValue() shouldBe
+                    "string"
+                photoCreateSchema["properties"]["createdAt"]["format"].stringValue() shouldBe
                     "date-time"
 
                 val invitationInfo = document.operation("/api/v1/groups/invitations", "get")
@@ -507,6 +543,14 @@ private val operationExampleExpectations = listOf(
         requestSchema = "PhotoUploadUrlRequest",
         success = OpenApiExample.PHOTO_UPLOAD_URL_RESPONSE,
         successSchema = "PhotoUploadUrlResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/photos",
+        method = "post",
+        request = OpenApiExample.PHOTO_CREATE_REQUEST,
+        requestSchema = "PhotoCreateRequest",
+        success = OpenApiExample.PHOTO_CREATE_RESPONSE,
+        successSchema = "PhotoCreateResponse",
     ),
     OperationExampleExpectation(
         path = "/init/versions",
@@ -661,6 +705,39 @@ private val errorResponseExpectations = listOf(
         "post",
         "404",
         setOf(ErrorCode.USER_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/photos",
+        "post",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST, ErrorCode.INVALID_OBJECT_KEY),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/photos",
+        "post",
+        "403",
+        setOf(ErrorCode.NOT_GROUP_MEMBER),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/photos",
+        "post",
+        "404",
+        setOf(ErrorCode.USER_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/photos",
+        "post",
+        "409",
+        setOf(
+            ErrorCode.PHOTO_ALREADY_REGISTERED,
+            ErrorCode.DAILY_GROUP_UPLOAD_LIMIT_EXCEEDED,
+        ),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/photos",
+        "post",
+        "422",
+        setOf(ErrorCode.OBJECT_NOT_UPLOADED),
     ),
     ErrorResponseExpectation(
         "/init/versions",

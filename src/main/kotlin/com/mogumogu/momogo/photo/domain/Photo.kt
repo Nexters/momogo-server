@@ -9,6 +9,7 @@ import jakarta.persistence.ForeignKey
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.Index
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
@@ -17,6 +18,12 @@ import jakarta.persistence.UniqueConstraint
 @Entity
 @Table(
     name = "photo",
+    indexes = [
+        Index(
+            name = "idx_photo_user_id",
+            columnList = "user_id",
+        ),
+    ],
     uniqueConstraints = [
         UniqueConstraint(
             name = "uq_photo_object_key",
@@ -44,7 +51,12 @@ class Photo(
     @field:Column(name = "size_bytes", nullable = false, updatable = false)
     private var _sizeBytes: Long,
 
-    @field:Column(name = "content_type", nullable = false, updatable = false, length = CONTENT_TYPE_MAX_LENGTH)
+    @field:Column(
+        name = "content_type",
+        nullable = false,
+        updatable = false,
+        length = PhotoContentType.MAX_VALUE_LENGTH,
+    )
     private var _contentType: String,
 ) : BaseEntity() {
 
@@ -70,14 +82,16 @@ class Photo(
             "오브젝트 키는 ${OBJECT_KEY_MAX_LENGTH}자를 초과할 수 없습니다."
         }
         require(_sizeBytes > 0) { "사진 크기는 0보다 커야 합니다." }
-        require(_contentType.isNotBlank()) { "콘텐츠 타입은 비어 있을 수 없습니다." }
-        require(_contentType.length <= CONTENT_TYPE_MAX_LENGTH) {
-            "콘텐츠 타입은 ${CONTENT_TYPE_MAX_LENGTH}자를 초과할 수 없습니다."
+        val contentType = requireNotNull(PhotoContentType.from(_contentType)) {
+            "이미지 콘텐츠 타입이 올바르지 않습니다."
         }
+        require(contentType.extension == _objectKey.substringAfterLast('.', "")) {
+            "콘텐츠 타입이 오브젝트 키 확장자와 일치하지 않습니다."
+        }
+        _contentType = contentType.value
     }
 
     private companion object {
         const val OBJECT_KEY_MAX_LENGTH = 512
-        const val CONTENT_TYPE_MAX_LENGTH = 100
     }
 }

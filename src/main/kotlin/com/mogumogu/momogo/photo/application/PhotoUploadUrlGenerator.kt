@@ -1,12 +1,13 @@
 package com.mogumogu.momogo.photo.application
 
+import com.mogumogu.momogo.photo.domain.PhotoContentType
 import com.mogumogu.momogo.photo.domain.PhotoObjectKey
 import java.time.LocalDateTime
 
 interface PhotoUploadUrlGenerator {
     fun generate(
         objectKey: PhotoObjectKey,
-        contentTypeValue: String,
+        contentType: PhotoContentType,
     ): GeneratedPhotoUploadUrl
 }
 
