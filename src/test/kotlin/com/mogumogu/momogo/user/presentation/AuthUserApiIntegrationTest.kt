@@ -1,5 +1,6 @@
 package com.mogumogu.momogo.user.presentation
 
+import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.global.token.JwtProperties
 import com.mogumogu.momogo.global.token.RefreshTokenProvider
 import com.mogumogu.momogo.group.domain.Group
@@ -165,13 +166,14 @@ class AuthUserApiIntegrationTest(
     fun assertProblem(
         response: MockHttpServletResponse,
         status: HttpStatus,
-        detail: String,
+        errorCode: ErrorCode,
     ) {
         response.status shouldBe status.value()
         response.contentType shouldBe MediaType.APPLICATION_PROBLEM_JSON_VALUE
         val body = objectMapper.readTree(response.contentAsString)
         body["status"].intValue() shouldBe status.value()
-        body["detail"].stringValue() shouldBe detail
+        body["detail"].stringValue() shouldBe errorCode.message
+        body["code"].stringValue() shouldBe errorCode.name
     }
 
     fun issueCustomAccessToken(
@@ -325,8 +327,8 @@ class AuthUserApiIntegrationTest(
                 ).forEach { changedToken ->
                     assertProblem(
                         response = login(changedToken),
-                        status = HttpStatus.UNAUTHORIZED,
-                        detail = "인증 정보가 올바르지 않습니다.",
+                        status = HttpStatus.NOT_FOUND,
+                        errorCode = ErrorCode.USER_NOT_FOUND,
                     )
                 }
             }
@@ -343,7 +345,7 @@ class AuthUserApiIntegrationTest(
                 assertProblem(
                     response = register(providerToken),
                     status = HttpStatus.CONFLICT,
-                    detail = "이미 등록된 로그인 계정입니다.",
+                    errorCode = ErrorCode.DUPLICATE_LOGIN_ACCOUNT,
                 )
                 userRepository.count() shouldBe 1L
                 loginAccountRepository.count() shouldBe 1L
@@ -382,7 +384,7 @@ class AuthUserApiIntegrationTest(
                             provider = provider,
                         ),
                         status = HttpStatus.BAD_REQUEST,
-                        detail = "지원하지 않는 로그인 제공자입니다.",
+                        errorCode = ErrorCode.UNSUPPORTED_PROVIDER,
                     )
                     assertProblem(
                         response = login(
@@ -390,7 +392,7 @@ class AuthUserApiIntegrationTest(
                             provider = provider,
                         ),
                         status = HttpStatus.BAD_REQUEST,
-                        detail = "지원하지 않는 로그인 제공자입니다.",
+                        errorCode = ErrorCode.UNSUPPORTED_PROVIDER,
                     )
                 }
                 userRepository.count() shouldBe 0L
@@ -400,13 +402,13 @@ class AuthUserApiIntegrationTest(
 
     given("등록되지 않은 Guest 로그인 정보가 있으면") {
         `when`("로그인을 요청할 때") {
-            then("401 ProblemDetail을 반환한다") {
+            then("액세스 토큰 문제와 구분되도록 404 ProblemDetail을 반환한다") {
                 cleanDatabase()
 
                 assertProblem(
                     response = login("unknown-guest"),
-                    status = HttpStatus.UNAUTHORIZED,
-                    detail = "인증 정보가 올바르지 않습니다.",
+                    status = HttpStatus.NOT_FOUND,
+                    errorCode = ErrorCode.USER_NOT_FOUND,
                 )
             }
         }
@@ -442,7 +444,7 @@ class AuthUserApiIntegrationTest(
                 assertProblem(
                     response = getMe(null),
                     status = HttpStatus.UNAUTHORIZED,
-                    detail = "인증 정보가 올바르지 않습니다.",
+                    errorCode = ErrorCode.INVALID_AUTH_CREDENTIALS,
                 )
             }
         }
@@ -459,7 +461,7 @@ class AuthUserApiIntegrationTest(
                 assertProblem(
                     response = getMe(accessToken),
                     status = HttpStatus.NOT_FOUND,
-                    detail = "사용자를 찾을 수 없습니다.",
+                    errorCode = ErrorCode.USER_NOT_FOUND,
                 )
             }
         }
@@ -495,13 +497,13 @@ class AuthUserApiIntegrationTest(
                 assertProblem(
                     response = updateNickname(null, "새 닉네임"),
                     status = HttpStatus.UNAUTHORIZED,
-                    detail = "인증 정보가 올바르지 않습니다.",
+                    errorCode = ErrorCode.INVALID_AUTH_CREDENTIALS,
                 )
                 listOf("   ", "가".repeat(13)).forEach { invalidNickname ->
                     assertProblem(
                         response = updateNickname(accessToken, invalidNickname),
                         status = HttpStatus.BAD_REQUEST,
-                        detail = "요청 값이 올바르지 않습니다.",
+                        errorCode = ErrorCode.INVALID_REQUEST,
                     )
                 }
             }
@@ -537,7 +539,7 @@ class AuthUserApiIntegrationTest(
                     assertProblem(
                         response = response,
                         status = HttpStatus.UNAUTHORIZED,
-                        detail = "인증 정보가 올바르지 않습니다.",
+                        errorCode = ErrorCode.INVALID_AUTH_CREDENTIALS,
                     )
                     response.contentAsString.contains(invalidToken) shouldBe false
                     response.contentAsString.contains("Jwt") shouldBe false
@@ -604,14 +606,14 @@ class AuthUserApiIntegrationTest(
 
                 assertProblem(
                     response = reissue(oldRefreshToken),
-                    status = HttpStatus.UNAUTHORIZED,
-                    detail = "유효하지 않은 리프레시 토큰입니다.",
+                    status = HttpStatus.NOT_FOUND,
+                    errorCode = ErrorCode.INVALID_REFRESH_TOKEN,
                 )
             }
         }
 
         `when`("같은 refresh token으로 동시에 두 번 재발급할 때") {
-            then("DB 잠금으로 하나만 성공하고 다른 요청은 401이 된다") {
+            then("DB 잠금으로 하나만 성공하고 다른 요청은 404가 된다") {
                 cleanDatabase()
                 val registerBody = objectMapper.readTree(
                     register("concurrent-rotation-guest").contentAsString,
@@ -624,7 +626,7 @@ class AuthUserApiIntegrationTest(
 
                 responses.map { it.status }.sorted() shouldContainExactly listOf(
                     HttpStatus.OK.value(),
-                    HttpStatus.UNAUTHORIZED.value(),
+                    HttpStatus.NOT_FOUND.value(),
                 )
                 val savedTokens = refreshTokenRepository.findAll()
                 savedTokens.size shouldBe 2
@@ -656,8 +658,8 @@ class AuthUserApiIntegrationTest(
 
                 assertProblem(
                     response = reissue(expiredRawToken),
-                    status = HttpStatus.UNAUTHORIZED,
-                    detail = "유효하지 않은 리프레시 토큰입니다.",
+                    status = HttpStatus.NOT_FOUND,
+                    errorCode = ErrorCode.INVALID_REFRESH_TOKEN,
                 )
                 listOf(
                     logout(refreshToken),
@@ -672,8 +674,8 @@ class AuthUserApiIntegrationTest(
                 assertJsonResponse(updateNickname(accessToken, "로그아웃 후"))
                 assertProblem(
                     response = reissue(refreshToken),
-                    status = HttpStatus.UNAUTHORIZED,
-                    detail = "유효하지 않은 리프레시 토큰입니다.",
+                    status = HttpStatus.NOT_FOUND,
+                    errorCode = ErrorCode.INVALID_REFRESH_TOKEN,
                 )
             }
         }
@@ -743,12 +745,12 @@ class AuthUserApiIntegrationTest(
                 assertProblem(
                     response = updateNickname(accessToken, "탈퇴 후"),
                     status = HttpStatus.NOT_FOUND,
-                    detail = "사용자를 찾을 수 없습니다.",
+                    errorCode = ErrorCode.USER_NOT_FOUND,
                 )
                 assertProblem(
                     response = reissue(refreshToken),
-                    status = HttpStatus.UNAUTHORIZED,
-                    detail = "유효하지 않은 리프레시 토큰입니다.",
+                    status = HttpStatus.NOT_FOUND,
+                    errorCode = ErrorCode.INVALID_REFRESH_TOKEN,
                 )
             }
         }
@@ -774,13 +776,13 @@ class AuthUserApiIntegrationTest(
                 assertJsonResponse(withdrawResponse)
                 (reissueResponse.status in setOf(
                     HttpStatus.OK.value(),
-                    HttpStatus.UNAUTHORIZED.value(),
+                    HttpStatus.NOT_FOUND.value(),
                 )) shouldBe true
-                if (reissueResponse.status == HttpStatus.UNAUTHORIZED.value()) {
+                if (reissueResponse.status == HttpStatus.NOT_FOUND.value()) {
                     assertProblem(
                         response = reissueResponse,
-                        status = HttpStatus.UNAUTHORIZED,
-                        detail = "유효하지 않은 리프레시 토큰입니다.",
+                        status = HttpStatus.NOT_FOUND,
+                        errorCode = ErrorCode.INVALID_REFRESH_TOKEN,
                     )
                 }
                 userRepository.count() shouldBe 0L
@@ -833,7 +835,7 @@ class AuthUserApiIntegrationTest(
                     assertProblem(
                         response = response,
                         status = HttpStatus.BAD_REQUEST,
-                        detail = "요청 값이 올바르지 않습니다.",
+                        errorCode = ErrorCode.INVALID_REQUEST,
                     )
                     response.contentAsString.contains("Json") shouldBe false
                     response.contentAsString.contains("LoginProvider") shouldBe false

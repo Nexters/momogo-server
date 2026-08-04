@@ -4,6 +4,9 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 import org.springframework.web.ErrorResponseException
 
+fun ProblemDetail.withErrorCode(errorCode: ErrorCode): ProblemDetail =
+    apply { setProperty("code", errorCode.name) }
+
 sealed class ApiException(
     status: HttpStatus,
     val errorCode: ErrorCode,
@@ -15,6 +18,10 @@ sealed class ApiException(
     },
     null,
 ) {
+
+    init {
+        body.withErrorCode(errorCode)
+    }
 
     class BadRequest(
         errorCode: ErrorCode,

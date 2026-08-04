@@ -95,6 +95,7 @@ class PhotoUploadUrlApiIntegrationTest(
         val body = objectMapper.readTree(response.contentAsString)
         body["status"].intValue() shouldBe status.value()
         body["detail"].stringValue() shouldBe errorCode.message
+        body["code"].stringValue() shouldBe errorCode.name
     }
 
     given("인증된 사용자가 이미지 MIME 타입을 입력하면") {

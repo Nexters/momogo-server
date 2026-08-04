@@ -54,9 +54,9 @@ class AuthService(
     ): AuthenticatedUser {
         val providerId = providerTokenAuthenticationService.authenticate(provider, providerToken)
         val loginAccount = loginAccountRepository.findByProviderAndProviderId(provider, providerId)
-            ?: throw ApiException.Unauthorized(ErrorCode.INVALID_AUTH_CREDENTIALS)
+            ?: throw ApiException.NotFound(ErrorCode.USER_NOT_FOUND)
         val user = userRepository.findByIdForUpdate(loginAccount.user.id!!)
-            ?: throw ApiException.Unauthorized(ErrorCode.INVALID_AUTH_CREDENTIALS)
+            ?: throw ApiException.NotFound(ErrorCode.USER_NOT_FOUND)
 
         return user.toAuthenticatedUser(tokenIssuer.issue(user))
     }
@@ -65,13 +65,13 @@ class AuthService(
     fun reissue(refreshToken: String): ReissuedTokens {
         val tokenHash = refreshTokenProvider.hash(refreshToken)
         val savedToken = refreshTokenRepository.findByTokenHashForUpdate(tokenHash)
-            ?: throw ApiException.Unauthorized(ErrorCode.INVALID_REFRESH_TOKEN)
+            ?: throw ApiException.NotFound(ErrorCode.INVALID_REFRESH_TOKEN)
         val user = userRepository.findByIdForUpdate(savedToken.user.id!!)
-            ?: throw ApiException.Unauthorized(ErrorCode.INVALID_REFRESH_TOKEN)
+            ?: throw ApiException.NotFound(ErrorCode.INVALID_REFRESH_TOKEN)
         val now = clock.instant()
 
         if (!savedToken.isActive(now)) {
-            throw ApiException.Unauthorized(ErrorCode.INVALID_REFRESH_TOKEN)
+            throw ApiException.NotFound(ErrorCode.INVALID_REFRESH_TOKEN)
         }
 
         savedToken.revoke(now)

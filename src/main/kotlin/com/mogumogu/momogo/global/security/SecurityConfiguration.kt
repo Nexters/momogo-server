@@ -15,6 +15,33 @@ class SecurityConfiguration(
 ) {
 
     @Bean
+    @Order(0)
+    fun publicApiSecurityFilterChain(http: HttpSecurity): SecurityFilterChain {
+        http
+            .securityMatchers { matchers ->
+                matchers
+                    .requestMatchers(HttpMethod.GET, "/init/versions")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/user/register")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/login")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/reissue")
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/logout")
+            }
+            .csrf { csrf -> csrf.disable() }
+            .formLogin { formLogin -> formLogin.disable() }
+            .httpBasic { httpBasic -> httpBasic.disable() }
+            .logout { logout -> logout.disable() }
+            .requestCache { requestCache -> requestCache.disable() }
+            .sessionManagement { sessions ->
+                sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            }
+            .authorizeHttpRequests { requests ->
+                requests.anyRequest().permitAll()
+            }
+
+        return http.build()
+    }
+
+    @Bean
     @Order(2)
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http
@@ -39,11 +66,6 @@ class SecurityConfiguration(
             }
             .authorizeHttpRequests { requests ->
                 requests
-                    .requestMatchers(HttpMethod.GET, "/init/versions").permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/user/register").permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/reissue").permitAll()
-                    .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/logout").permitAll()
                     .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                     .requestMatchers(
                         "/v3/api-docs",

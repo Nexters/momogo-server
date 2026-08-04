@@ -228,11 +228,8 @@ class OpenApiConfiguration(
             "title" to status.reasonPhrase,
             "status" to status.value(),
             "detail" to message,
-        ) + if (this == ErrorCode.INVALID_PLATFORM) {
-            mapOf("code" to name)
-        } else {
-            emptyMap()
-        }
+            "code" to name,
+        )
 
     companion object {
         const val BEARER_AUTH = "bearerAuth"

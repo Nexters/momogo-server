@@ -37,7 +37,7 @@ class AuthController(
             ErrorCode.INVALID_REQUEST,
             ErrorCode.UNSUPPORTED_PROVIDER,
         ],
-        unauthorized = [ErrorCode.INVALID_AUTH_CREDENTIALS],
+        notFound = [ErrorCode.USER_NOT_FOUND],
     )
     @PostMapping("/login")
     fun login(
@@ -68,7 +68,7 @@ class AuthController(
     )
     @ApiErrors(
         badRequest = [ErrorCode.INVALID_REQUEST],
-        unauthorized = [ErrorCode.INVALID_REFRESH_TOKEN],
+        notFound = [ErrorCode.INVALID_REFRESH_TOKEN],
     )
     @PostMapping("/reissue")
     fun reissue(

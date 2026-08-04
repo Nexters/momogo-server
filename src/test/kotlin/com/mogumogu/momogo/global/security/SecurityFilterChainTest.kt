@@ -20,6 +20,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import tools.jackson.databind.ObjectMapper
 import java.time.Instant
 
@@ -50,6 +51,7 @@ class SecurityFilterChainTest(
                 response.getHeader(HttpHeaders.WWW_AUTHENTICATE) shouldBe "Bearer"
                 body["status"].intValue() shouldBe 401
                 body["detail"].stringValue() shouldBe ErrorCode.INVALID_AUTH_CREDENTIALS.message
+                body["code"].stringValue() shouldBe ErrorCode.INVALID_AUTH_CREDENTIALS.name
                 body["instance"].stringValue() shouldBe "/api/v1/user"
                 result.request.getSession(false) shouldBe null
             }
@@ -90,6 +92,56 @@ class SecurityFilterChainTest(
                 response.status shouldBe 401
                 response.contentType shouldBe MediaType.APPLICATION_PROBLEM_JSON_VALUE
                 response.contentAsString shouldNotContain token
+            }
+        }
+    }
+
+    given("인증이 필요 없는 엔드포인트에 쓸모없는 access token이 딸려 오면") {
+        val now = Instant.now()
+        val expiredToken = encode(
+            subject = "1",
+            issuer = jwtProperties.issuer,
+            issuedAt = now.minusSeconds(120),
+            expiresAt = now.minusSeconds(60),
+            jwtEncoder = jwtEncoder,
+        )
+
+        `when`("만료된 Bearer token으로 토큰 재발급을 요청할 때") {
+            val response = mockMvc.perform(
+                post("/api/v1/auth/reissue")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $expiredToken")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"refreshToken":"not-issued-refresh-token"}"""),
+            ).andReturn().response
+
+            then("필터가 아니라 컨트롤러가 처리해 401이 아닌 404를 반환한다") {
+                response.status shouldBe 404
+            }
+        }
+
+        `when`("파싱할 수 없는 Bearer token으로 로그인을 요청할 때") {
+            val response = mockMvc.perform(
+                post("/api/v1/auth/login")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer raw.invalid.token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"provider":"GUEST","providerToken":"filter-chain-unregistered"}"""),
+            ).andReturn().response
+
+            then("401이 아닌 404를 반환한다") {
+                response.status shouldBe 404
+            }
+        }
+
+        `when`("만료된 Bearer token으로 앱 버전을 조회할 때") {
+            val response = mockMvc.perform(
+                get("/init/versions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $expiredToken")
+                    .queryParam("platform", "IOS")
+                    .queryParam("appVersion", "1.0.0"),
+            ).andReturn().response
+
+            then("토큰을 검사하지 않고 정상 응답한다") {
+                response.status shouldBe 200
             }
         }
     }

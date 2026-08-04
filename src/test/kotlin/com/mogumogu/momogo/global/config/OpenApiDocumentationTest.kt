@@ -176,10 +176,10 @@ class OpenApiDocumentationTest(
                 register.hasResponseMediaType("200", "application/json") shouldBe true
                 register.hasResponseMediaType("400", "application/problem+json") shouldBe true
                 login["summary"].stringValue() shouldBe "로그인"
-                login.responseCodes() shouldBe setOf("200", "400", "401")
-                login.hasResponseMediaType("401", "application/problem+json") shouldBe true
+                login.responseCodes() shouldBe setOf("200", "400", "404")
+                login.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 reissue["summary"].stringValue() shouldBe "토큰 재발급"
-                reissue.responseCodes() shouldBe setOf("200", "400", "401")
+                reissue.responseCodes() shouldBe setOf("200", "400", "404")
                 logout["summary"].stringValue() shouldBe "로그아웃"
                 logout.responseCodes() shouldBe setOf("200", "400")
                 getMe["summary"].stringValue() shouldBe "내 정보 조회"
@@ -589,8 +589,8 @@ private val errorResponseExpectations = listOf(
     ErrorResponseExpectation(
         "/api/v1/auth/login",
         "post",
-        "401",
-        setOf(ErrorCode.INVALID_AUTH_CREDENTIALS),
+        "404",
+        setOf(ErrorCode.USER_NOT_FOUND),
     ),
     ErrorResponseExpectation(
         "/api/v1/auth/reissue",
@@ -601,7 +601,7 @@ private val errorResponseExpectations = listOf(
     ErrorResponseExpectation(
         "/api/v1/auth/reissue",
         "post",
-        "401",
+        "404",
         setOf(ErrorCode.INVALID_REFRESH_TOKEN),
     ),
     ErrorResponseExpectation(
@@ -820,9 +820,5 @@ private fun JsonNode.shouldBeProblemExample(
     this["value"]["title"].stringValue() shouldBe status.reasonPhrase
     this["value"]["status"].intValue() shouldBe status.value()
     this["value"]["detail"].stringValue() shouldBe errorCode.message
-    if (errorCode == ErrorCode.INVALID_PLATFORM) {
-        this["value"]["code"].stringValue() shouldBe errorCode.name
-    } else {
-        this["value"].has("code") shouldBe false
-    }
+    this["value"]["code"].stringValue() shouldBe errorCode.name
 }
