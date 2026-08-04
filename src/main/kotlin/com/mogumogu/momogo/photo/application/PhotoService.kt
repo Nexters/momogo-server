@@ -13,6 +13,7 @@ import com.mogumogu.momogo.photo.infra.PhotoGroupRepository
 import com.mogumogu.momogo.photo.infra.PhotoRepository
 import com.mogumogu.momogo.user.domain.User
 import com.mogumogu.momogo.user.infra.UserRepository
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -60,13 +61,17 @@ class PhotoService(
             throw ApiException.Conflict(ErrorCode.DAILY_GROUP_UPLOAD_LIMIT_EXCEEDED)
         }
 
-        val photo = photoRepository.save(
-            createPhoto(
-                uploader = uploader,
-                objectKey = objectKey,
-                objectMetadata = objectMetadata,
-            ),
-        )
+        val photo = try {
+            photoRepository.saveAndFlush(
+                createPhoto(
+                    uploader = uploader,
+                    objectKey = objectKey,
+                    objectMetadata = objectMetadata,
+                ),
+            )
+        } catch (_: DataIntegrityViolationException) {
+            throw ApiException.Conflict(ErrorCode.PHOTO_ALREADY_REGISTERED)
+        }
         photoGroupRepository.saveAll(
             groups.map { group -> PhotoGroup(_photo = photo, _group = group) },
         )
