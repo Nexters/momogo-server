@@ -141,42 +141,17 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
     }
 
     given("DB 무결성 위반이 발생하면") {
-        `when`("원인 체인에 로그인 계정 unique constraint가 있을 때") {
-            val response = mockMvc.perform(get("/test/duplicate-login-account"))
-                .andReturn()
-                .response
-            val body = objectMapper.readTree(response.contentAsString)
-
-            then("중복 계정 409 ProblemDetail로 응답한다") {
-                response.status shouldBe 409
-                response.contentType shouldBe MediaType.APPLICATION_PROBLEM_JSON_VALUE
-                body["detail"].stringValue() shouldBe "이미 등록된 로그인 계정입니다."
-                body["instance"].stringValue() shouldBe "/test/duplicate-login-account"
-            }
-        }
-
-        `when`("원인 체인에 사진 object key unique constraint가 있을 때") {
-            val response = mockMvc.perform(get("/test/duplicate-photo"))
-                .andReturn()
-                .response
-            val body = objectMapper.readTree(response.contentAsString)
-
-            then("이미 등록된 사진 409 ProblemDetail로 응답한다") {
-                response.status shouldBe 409
-                body["detail"].stringValue() shouldBe ErrorCode.PHOTO_ALREADY_REGISTERED.message
-            }
-        }
-
-        `when`("다른 constraint 위반일 때") {
+        `when`("저장 지점에서 비즈니스 오류로 변환하지 않은 위반일 때") {
             val response = mockMvc.perform(get("/test/other-data-integrity"))
                 .andReturn()
                 .response
             val body = objectMapper.readTree(response.contentAsString)
 
-            then("중복 계정으로 오인하지 않고 안전한 500 ProblemDetail로 응답한다") {
+            then("constraint 이름을 해석하지 않고 안전한 500 ProblemDetail로 응답한다") {
                 response.status shouldBe 500
                 response.contentType shouldBe MediaType.APPLICATION_PROBLEM_JSON_VALUE
                 body["detail"].stringValue() shouldBe "서버 내부 오류가 발생했습니다."
+                body["code"].stringValue() shouldBe ErrorCode.INTERNAL_SERVER_ERROR.name
                 response.contentAsString.contains("민감한 providerToken") shouldBe false
                 body["instance"].stringValue() shouldBe "/test/other-data-integrity"
             }
@@ -221,16 +196,6 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
             request: EnumRequest
         ) = request
 
-        @GetMapping("/duplicate-login-account")
-        fun duplicateLoginAccount(): Nothing =
-            throw constraintViolation(
-                """PUBLIC."UK_LOGIN_ACCOUNT_PROVIDER_PROVIDER_ID_INDEX_8 ON PUBLIC.LOGIN_ACCOUNT"""",
-            )
-
-        @GetMapping("/duplicate-photo")
-        fun duplicatePhoto(): Nothing =
-            throw constraintViolation("PUBLIC.UQ_PHOTO_OBJECT_KEY_INDEX_4")
-
         @GetMapping("/other-data-integrity")
         fun otherDataIntegrity(): Nothing =
             throw DataIntegrityViolationException(
@@ -245,19 +210,6 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
         @GetMapping("/illegal-argument")
         fun illegalArgument(): Nothing =
             throw IllegalArgumentException("민감한 내부 메시지")
-
-        private fun constraintViolation(constraintName: String): DataIntegrityViolationException =
-            DataIntegrityViolationException(
-                "저장 실패",
-                RuntimeException(
-                    "중첩된 원인",
-                    ConstraintViolationException(
-                        "unique constraint 위반",
-                        SQLException("unique constraint 위반"),
-                        constraintName,
-                    ),
-                ),
-            )
     }
 
     private data class TestRequest(

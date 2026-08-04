@@ -9,6 +9,7 @@ import com.mogumogu.momogo.user.domain.User
 import com.mogumogu.momogo.user.infra.LoginAccountRepository
 import com.mogumogu.momogo.user.infra.RefreshTokenRepository
 import com.mogumogu.momogo.user.infra.UserRepository
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -36,13 +37,17 @@ class AuthService(
         }
 
         val user = userRepository.save(createUser(nickname))
-        loginAccountRepository.saveAndFlush(
-            LoginAccount(
-                _user = user,
-                _provider = provider,
-                _providerId = providerId,
-            ),
-        )
+        try {
+            loginAccountRepository.saveAndFlush(
+                LoginAccount(
+                    _user = user,
+                    _provider = provider,
+                    _providerId = providerId,
+                ),
+            )
+        } catch (_: DataIntegrityViolationException) {
+            throw ApiException.Conflict(ErrorCode.DUPLICATE_LOGIN_ACCOUNT)
+        }
 
         return user.toAuthenticatedUser(tokenIssuer.issue(user))
     }

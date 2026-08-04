@@ -1,9 +1,7 @@
 package com.mogumogu.momogo.global.error
 
 import jakarta.servlet.http.HttpServletRequest
-import org.hibernate.exception.ConstraintViolationException
 import org.slf4j.LoggerFactory
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.*
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
@@ -58,33 +56,6 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
             request,
         )
 
-    @ExceptionHandler(DataIntegrityViolationException::class)
-    fun handleDataIntegrityViolationException(
-        exception: DataIntegrityViolationException,
-        request: HttpServletRequest,
-    ): ProblemDetail {
-        val errorCode = when {
-            exception.hasConstraint(PHOTO_OBJECT_KEY_UNIQUE_CONSTRAINT_PATTERN) ->
-                ErrorCode.PHOTO_ALREADY_REGISTERED
-            exception.hasConstraint(LOGIN_ACCOUNT_UNIQUE_CONSTRAINT_PATTERN) ->
-                ErrorCode.DUPLICATE_LOGIN_ACCOUNT
-            else -> null
-        }
-        if (errorCode != null) {
-            return createProblemDetail(
-                status = HttpStatus.CONFLICT,
-                errorCode = errorCode,
-            )
-        }
-
-        logUnexpectedException(exception, request)
-
-        return createProblemDetail(
-            status = HttpStatus.INTERNAL_SERVER_ERROR,
-            errorCode = ErrorCode.INTERNAL_SERVER_ERROR,
-        )
-    }
-
     @ExceptionHandler(Exception::class)
     fun handleUnexpectedException(
         exception: Exception,
@@ -107,12 +78,6 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
             withErrorCode(errorCode)
         }
 
-    private fun DataIntegrityViolationException.hasConstraint(pattern: Regex): Boolean =
-        generateSequence<Throwable>(this) { it.cause }
-            .filterIsInstance<ConstraintViolationException>()
-            .mapNotNull { it.constraintName }
-            .any(pattern::containsMatchIn)
-
     private fun logUnexpectedException(
         exception: Exception,
         request: HttpServletRequest,
@@ -129,17 +94,4 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         val field: String,
         val message: String,
     )
-
-    private companion object {
-        const val LOGIN_ACCOUNT_UNIQUE_CONSTRAINT = "uk_login_account_provider_provider_id"
-        const val PHOTO_OBJECT_KEY_UNIQUE_CONSTRAINT = "uq_photo_object_key"
-        val LOGIN_ACCOUNT_UNIQUE_CONSTRAINT_PATTERN = Regex(
-            constraintPattern(LOGIN_ACCOUNT_UNIQUE_CONSTRAINT),
-        )
-        val PHOTO_OBJECT_KEY_UNIQUE_CONSTRAINT_PATTERN = Regex(
-            constraintPattern(PHOTO_OBJECT_KEY_UNIQUE_CONSTRAINT),
-        )
-        fun constraintPattern(constraintName: String): String =
-            """(?i)(?:^|[."`])$constraintName(?:$|_INDEX_|["`\s])"""
-    }
 }
