@@ -182,7 +182,7 @@ class UserEntityTest(
             }
         }
 
-        then("닉네임 컬럼 길이를 도메인 최대 길이와 같은 12자로 제한한다") {
+        then("DB 변경 없이 닉네임 컬럼 길이를 12자로 유지한다") {
             User::class.java
                 .getDeclaredField("_nickname")
                 .getAnnotation(Column::class.java)

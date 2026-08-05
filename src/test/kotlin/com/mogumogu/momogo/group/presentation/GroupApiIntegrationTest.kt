@@ -270,11 +270,11 @@ class GroupApiIntegrationTest(
                 cleanDatabase()
                 val requestingUser = registerUser("joined-group-list-requester")
                 val withdrawnUploader = registerUser("joined-group-list-withdrawn-uploader")
-                val firstUploader = userRepository.saveAndFlush(User(_nickname = "첫 번째 업로더"))
-                val secondUploader = userRepository.saveAndFlush(User(_nickname = "두 번째 업로더"))
-                val previousDayUploader = userRepository.saveAndFlush(User(_nickname = "어제 업로더"))
-                val unlinkedUploader = userRepository.saveAndFlush(User(_nickname = "연결 해제 업로더"))
-                val leftUploader = userRepository.saveAndFlush(User(_nickname = "탈퇴 업로더"))
+                val firstUploader = userRepository.saveAndFlush(User(_nickname = "첫 업로더"))
+                val secondUploader = userRepository.saveAndFlush(User(_nickname = "둘 업로더"))
+                val previousDayUploader = userRepository.saveAndFlush(User(_nickname = "어제업로더"))
+                val unlinkedUploader = userRepository.saveAndFlush(User(_nickname = "연결업로더"))
+                val leftUploader = userRepository.saveAndFlush(User(_nickname = "탈퇴업로더"))
                 val groupWithPhotos = saveGroup(
                     name = "오늘 사진이 있는 그룹",
                     code = "LIST01",
@@ -432,16 +432,17 @@ class GroupApiIntegrationTest(
     }
 
     given("유효하지 않은 그룹명이 있으면") {
-        `when`("공백, 누락 또는 255자를 초과한 이름으로 그룹을 생성할 때") {
+        `when`("공백, 누락 또는 16자를 초과한 이름으로 그룹을 생성할 때") {
             then("400을 반환하고 그룹과 멤버십을 저장하지 않는다") {
                 cleanDatabase()
                 val accessToken = objectMapper.readTree(
                     register("invalid-group-name").contentAsString,
                 )["accessToken"].stringValue()
 
+                val oversizedResponse = createGroup(accessToken, "가".repeat(17))
                 listOf(
                     createGroup(accessToken, "   "),
-                    createGroup(accessToken, "가".repeat(256)),
+                    oversizedResponse,
                     createGroupWithContent(accessToken, "{}"),
                 ).forEach { response ->
                     assertProblem(
@@ -450,6 +451,10 @@ class GroupApiIntegrationTest(
                         errorCode = ErrorCode.INVALID_REQUEST,
                     )
                 }
+                val body = objectMapper.readTree(oversizedResponse.contentAsString)
+                body["errors"][0]["field"].stringValue() shouldBe "name"
+                body["errors"][0]["message"].stringValue() shouldBe
+                    "name은 16자를 초과할 수 없습니다."
                 groupRepository.count() shouldBe 0L
                 groupMemberRepository.count() shouldBe 0L
             }
@@ -545,7 +550,7 @@ class GroupApiIntegrationTest(
     }
 
     given("유효하지 않은 변경 그룹명이 있으면") {
-        `when`("공백, 누락 또는 255자를 초과한 이름으로 그룹명 변경을 요청할 때") {
+        `when`("공백, 누락 또는 16자를 초과한 이름으로 그룹명 변경을 요청할 때") {
             then("400을 반환하고 기존 그룹명을 유지한다") {
                 cleanDatabase()
                 val registeredUser = registerUser("invalid-update-group-name")
@@ -556,9 +561,14 @@ class GroupApiIntegrationTest(
                 saveMember(group, registeredUser.user)
                 val groupId = requireNotNull(group.id)
 
+                val oversizedResponse = updateGroupName(
+                    registeredUser.accessToken,
+                    groupId,
+                    "가".repeat(17),
+                )
                 listOf(
                     updateGroupName(registeredUser.accessToken, groupId, "   "),
-                    updateGroupName(registeredUser.accessToken, groupId, "가".repeat(256)),
+                    oversizedResponse,
                     updateGroupNameWithContent(registeredUser.accessToken, groupId, "{}"),
                 ).forEach { response ->
                     assertProblem(
@@ -567,6 +577,10 @@ class GroupApiIntegrationTest(
                         errorCode = ErrorCode.INVALID_REQUEST,
                     )
                 }
+                val body = objectMapper.readTree(oversizedResponse.contentAsString)
+                body["errors"][0]["field"].stringValue() shouldBe "name"
+                body["errors"][0]["message"].stringValue() shouldBe
+                    "name은 16자를 초과할 수 없습니다."
                 groupRepository.findById(groupId).orElseThrow().name shouldBe "유지할 그룹명"
             }
         }
@@ -702,7 +716,7 @@ class GroupApiIntegrationTest(
                 val joinedMember = registerUser("invitation-info-joined")
                 val leftMember = registerUser("invitation-info-left")
                 val anotherJoinedUser = userRepository.saveAndFlush(
-                    User(_nickname = "다른 가입 멤버"),
+                    User(_nickname = "다른멤버"),
                 )
                 val group = saveGroup(
                     name = "우리 가족",
@@ -1121,7 +1135,7 @@ class GroupApiIntegrationTest(
                     name = "탈퇴할 수 없는 그룹",
                     code = "LEAVE0",
                 )
-                val owner = userRepository.saveAndFlush(User(_nickname = "그룹 유지 멤버"))
+                val owner = userRepository.saveAndFlush(User(_nickname = "그룹멤버"))
                 saveMember(group, owner)
                 saveMember(
                     group = group,

@@ -75,7 +75,7 @@ class Group(
 
         fun validateName(name: String) {
             require(name.isNotBlank()) { "그룹명은 비어 있을 수 없습니다." }
-            require(name.length <= 255) { "그룹명은 255자를 초과할 수 없습니다." }
+            require(name.length <= 16) { "그룹명은 16자를 초과할 수 없습니다." }
         }
     }
 }
