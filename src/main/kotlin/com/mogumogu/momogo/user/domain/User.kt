@@ -33,7 +33,7 @@ class User(
         fun normalizeNickname(nickname: String): String {
             val normalizedNickname = nickname.trim()
             require(normalizedNickname.isNotEmpty()) { "닉네임은 비어 있을 수 없습니다." }
-            require(normalizedNickname.length <= 12) { "닉네임은 12자를 초과할 수 없습니다." }
+            require(nickname.length <= 6) { "닉네임은 6자를 초과할 수 없습니다." }
             return normalizedNickname
         }
     }

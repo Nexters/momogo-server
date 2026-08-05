@@ -475,14 +475,14 @@ class AuthUserApiIntegrationTest(
                 val userId = registerBody["userId"].longValue()
                 val accessToken = registerBody["accessToken"].stringValue()
 
-                val response = updateNickname(accessToken, "  새 닉네임  ")
+                val response = updateNickname(accessToken, " 모모 ")
 
                 assertJsonResponse(response)
                 val body = objectMapper.readTree(response.contentAsString)
                 body.propertyNames().toSet() shouldBe setOf("userId", "nickname")
                 body["userId"].longValue() shouldBe userId
-                body["nickname"].stringValue() shouldBe "새 닉네임"
-                userRepository.findById(userId).orElseThrow().nickname shouldBe "새 닉네임"
+                body["nickname"].stringValue() shouldBe "모모"
+                userRepository.findById(userId).orElseThrow().nickname shouldBe "모모"
             }
         }
 
@@ -499,13 +499,21 @@ class AuthUserApiIntegrationTest(
                     status = HttpStatus.UNAUTHORIZED,
                     errorCode = ErrorCode.INVALID_AUTH_CREDENTIALS,
                 )
-                listOf("   ", "가".repeat(13)).forEach { invalidNickname ->
+                val oversizedResponse = updateNickname(accessToken, "가".repeat(7))
+                listOf(
+                    updateNickname(accessToken, "   "),
+                    oversizedResponse,
+                ).forEach { response ->
                     assertProblem(
-                        response = updateNickname(accessToken, invalidNickname),
+                        response = response,
                         status = HttpStatus.BAD_REQUEST,
                         errorCode = ErrorCode.INVALID_REQUEST,
                     )
                 }
+                val body = objectMapper.readTree(oversizedResponse.contentAsString)
+                body["errors"][0]["field"].stringValue() shouldBe "nickname"
+                body["errors"][0]["message"].stringValue() shouldBe
+                    "nickname은 6자를 초과할 수 없습니다."
             }
         }
     }
@@ -796,6 +804,10 @@ class AuthUserApiIntegrationTest(
         `when`("JSON 파싱, enum 변환, 필수 필드 또는 공백 검증이 실패할 때") {
             then("내부 파싱 메시지를 숨긴 400 ProblemDetail을 반환한다") {
                 cleanDatabase()
+                val oversizedNicknameResponse = register(
+                    providerToken = "valid-provider-token",
+                    nickname = "가".repeat(7),
+                )
                 val invalidResponses = listOf(
                     performJson(
                         post("/api/v1/user/register"),
@@ -821,10 +833,7 @@ class AuthUserApiIntegrationTest(
                         providerToken = "a".repeat(256),
                         nickname = "모모",
                     ),
-                    register(
-                        providerToken = "valid-provider-token",
-                        nickname = "가".repeat(13),
-                    ),
+                    oversizedNicknameResponse,
                     register(
                         providerToken = "blank-nickname-provider-token",
                         nickname = "   ",
@@ -840,6 +849,10 @@ class AuthUserApiIntegrationTest(
                     response.contentAsString.contains("Json") shouldBe false
                     response.contentAsString.contains("LoginProvider") shouldBe false
                 }
+                val oversizedBody = objectMapper.readTree(oversizedNicknameResponse.contentAsString)
+                oversizedBody["errors"][0]["field"].stringValue() shouldBe "nickname"
+                oversizedBody["errors"][0]["message"].stringValue() shouldBe
+                    "nickname은 6자를 초과할 수 없습니다."
                 userRepository.count() shouldBe 0L
             }
         }

@@ -310,7 +310,7 @@ class OpenApiDocumentationTest(
                 schemas["RegisterRequest"]["properties"]["providerToken"]["minLength"]
                     .intValue() shouldBe 1
                 schemas["RegisterRequest"]["properties"]["nickname"]["maxLength"]
-                    .intValue() shouldBe 12
+                    .intValue() shouldBe 6
                 schemas["RegisterRequest"]["required"].stringValues().toSet() shouldBe
                     setOf("provider", "providerToken", "nickname")
                 schemas["LoginRequest"]["required"].stringValues().toSet() shouldBe
@@ -322,7 +322,7 @@ class OpenApiDocumentationTest(
                 schemas["UserResponse"]["required"].stringValues().toSet() shouldBe
                     setOf("userId", "nickname")
                 schemas["CreateGroupRequest"]["properties"]["name"]["maxLength"]
-                    .intValue() shouldBe 255
+                    .intValue() shouldBe 16
                 schemas["CreateGroupRequest"]["required"].stringValues().toSet() shouldBe
                     setOf("name")
                 schemas["CreateGroupResponse"]["required"].stringValues().toSet() shouldBe
@@ -351,7 +351,7 @@ class OpenApiDocumentationTest(
                     "todayPhotoUploaderCount",
                 )
                 schemas["UpdateGroupRequest"]["properties"]["name"]["maxLength"]
-                    .intValue() shouldBe 255
+                    .intValue() shouldBe 16
                 schemas["UpdateGroupRequest"]["required"].stringValues().toSet() shouldBe
                     setOf("name")
 

@@ -9,6 +9,7 @@ import io.kotest.engine.concurrency.TestExecutionMode
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
 import io.kotest.matchers.shouldBe
+import jakarta.persistence.Column
 import jakarta.persistence.EntityManager
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
@@ -175,6 +176,13 @@ class GroupEntityTest(
                     method.name.startsWith("set")
                 } shouldBe true
             }
+        }
+
+        then("DB 변경 없이 그룹명 컬럼 길이를 255자로 유지한다") {
+            Group::class.java
+                .getDeclaredField("_name")
+                .getAnnotation(Column::class.java)
+                .length shouldBe 255
         }
     }
 })

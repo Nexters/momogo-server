@@ -292,11 +292,11 @@ data class JoinedGroupResponse(
 @Schema(description = "그룹 생성 요청")
 data class CreateGroupRequest(
     @field:NotBlank(message = "name은 비어 있을 수 없습니다.")
-    @field:Size(max = 255, message = "name은 255자를 초과할 수 없습니다.")
+    @field:Size(max = 16, message = "name은 16자를 초과할 수 없습니다.")
     @field:Schema(
         description = "생성할 그룹명",
         example = "모고모고",
-        maxLength = 255,
+        maxLength = 16,
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val name: String,
@@ -330,11 +330,11 @@ data class CreateGroupResponse(
 @Schema(description = "그룹 수정 요청")
 data class UpdateGroupRequest(
     @field:NotBlank(message = "name은 비어 있을 수 없습니다.")
-    @field:Size(max = 255, message = "name은 255자를 초과할 수 없습니다.")
+    @field:Size(max = 16, message = "name은 16자를 초과할 수 없습니다.")
     @field:Schema(
         description = "변경할 그룹명",
         example = "우리 가족 하우스",
-        maxLength = 255,
+        maxLength = 16,
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val name: String,

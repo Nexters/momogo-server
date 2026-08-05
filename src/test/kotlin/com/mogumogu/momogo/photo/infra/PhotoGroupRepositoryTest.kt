@@ -37,8 +37,8 @@ class PhotoGroupRepositoryTest(
     given("한 그룹에 여러 사용자의 사진이 있으면") {
         `when`("오늘 업로더 수와 사용자의 업로드 여부를 조회할 때") {
             then("각 조회를 단일 SQL로 처리하고 연관 엔티티를 추가 조회하지 않는다") {
-                val firstUser = User(_nickname = "첫 번째 업로더")
-                val secondUser = User(_nickname = "두 번째 업로더")
+                val firstUser = User(_nickname = "첫 업로더")
+                val secondUser = User(_nickname = "둘 업로더")
                 val group = Group(
                     _name = "사진 그룹",
                     _inviteCode = InviteCode(_value = "NPLUS1"),

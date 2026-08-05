@@ -157,10 +157,11 @@ data class RegisterRequest(
     val providerToken: String,
 
     @field:NotBlank(message = "nickname은 비어 있을 수 없습니다.")
+    @field:Size(max = 6, message = "nickname은 6자를 초과할 수 없습니다.")
     @field:Schema(
         description = "사용할 닉네임. 앞뒤 공백은 제거됩니다.",
         example = "모모",
-        maxLength = 12,
+        maxLength = 6,
     )
     val nickname: String,
 )
@@ -168,10 +169,11 @@ data class RegisterRequest(
 @Schema(description = "닉네임 변경 요청")
 data class UpdateNicknameRequest(
     @field:NotBlank(message = "nickname은 비어 있을 수 없습니다.")
+    @field:Size(max = 6, message = "nickname은 6자를 초과할 수 없습니다.")
     @field:Schema(
         description = "변경할 닉네임. 앞뒤 공백은 제거됩니다.",
         example = "새 닉네임",
-        maxLength = 12,
+        maxLength = 6,
     )
     val nickname: String,
 )

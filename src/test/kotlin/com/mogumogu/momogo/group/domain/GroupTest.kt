@@ -48,6 +48,15 @@ class GroupTest : BehaviorSpec({
             }
         }
 
+        `when`("길이가 16자인 그룹명을 사용할 때") {
+            then("경계 길이의 그룹명을 허용한다") {
+                Group(
+                    _name = "가".repeat(16),
+                    _inviteCode = InviteCode(_value = "ABC123"),
+                ).name shouldBe "가".repeat(16)
+            }
+        }
+
         `when`("초대 코드를 재발급할 때") {
             then("새로운 초대 코드를 조회할 수 있다") {
                 val group = createGroup()
@@ -109,14 +118,14 @@ class GroupTest : BehaviorSpec({
             }
         }
 
-        `when`("255자를 초과한 그룹명으로 그룹을 생성할 때") {
+        `when`("16자를 초과한 그룹명으로 그룹을 생성할 때") {
             then("생성을 거부한다") {
                 shouldThrow<IllegalArgumentException> {
                     Group(
-                        _name = "가".repeat(256),
+                        _name = "가".repeat(17),
                         _inviteCode = InviteCode(_value = "ABC123"),
                     )
-                }.message shouldBe "그룹명은 255자를 초과할 수 없습니다."
+                }.message shouldBe "그룹명은 16자를 초과할 수 없습니다."
             }
         }
 
@@ -124,8 +133,10 @@ class GroupTest : BehaviorSpec({
             then("기존 그룹명을 유지한다") {
                 val group = createGroup()
 
-                shouldThrow<IllegalArgumentException> {
-                    group.updateName("")
+                listOf("", "가".repeat(17)).forEach { name ->
+                    shouldThrow<IllegalArgumentException> {
+                        group.updateName(name)
+                    }
                 }
 
                 group.name shouldBe "모고모고"
