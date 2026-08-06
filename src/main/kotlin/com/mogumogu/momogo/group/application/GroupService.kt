@@ -2,6 +2,7 @@ package com.mogumogu.momogo.group.application
 
 import com.mogumogu.momogo.global.error.ApiException
 import com.mogumogu.momogo.global.error.ErrorCode
+import com.mogumogu.momogo.global.time.DailyTimeRangeFactory
 import com.mogumogu.momogo.group.domain.Group
 import com.mogumogu.momogo.group.domain.GroupMember
 import com.mogumogu.momogo.group.domain.InviteCode
@@ -21,6 +22,7 @@ class GroupService(
     private val photoGroupRepository: PhotoGroupRepository,
     private val userRepository: UserRepository,
     private val inviteCodeGenerator: InviteCodeGenerator,
+    private val dailyTimeRangeFactory: DailyTimeRangeFactory,
     private val clock: Clock,
 ) {
 
@@ -31,10 +33,10 @@ class GroupService(
         }
 
         val memberships = groupMemberRepository.findAllJoinedWithActiveGroupByUserId(userId)
-        val date = LocalDate.now(clock)
+        val timeRange = dailyTimeRangeFactory.today()
         if (memberships.isEmpty()) {
             return GetJoinedGroupsResult(
-                date = date,
+                date = timeRange.date,
                 groups = emptyList(),
             )
         }
@@ -44,17 +46,15 @@ class GroupService(
         }
         val memberCountByGroupId = groupMemberRepository.countJoinedByGroupIds(groupIds)
             .associate { count -> count.groupId to count.totalMemberCount }
-        val startAt = date.atStartOfDay(clock.zone).toInstant()
-        val endAt = date.plusDays(1).atStartOfDay(clock.zone).toInstant()
         val photoUploaderCountByGroupId = photoGroupRepository
             .countPhotoUploadersByGroupIdsAndCreatedAtRange(
                 groupIds = groupIds,
-                startAt = startAt,
-                endAt = endAt,
+                startAt = timeRange.startAt,
+                endAt = timeRange.endAt,
             ).associate { count -> count.groupId to count.uploaderCount }
 
         return GetJoinedGroupsResult(
-            date = date,
+            date = timeRange.date,
             groups = memberships.mapNotNull { membership ->
                 val group = membership.group
                 val groupId = checkNotNull(group.id) { "저장된 그룹 ID가 없습니다." }

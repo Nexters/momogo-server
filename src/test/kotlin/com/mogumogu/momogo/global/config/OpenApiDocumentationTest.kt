@@ -70,6 +70,8 @@ class OpenApiDocumentationTest(
                     .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/photos/upload-urls", "post")
                     .requiresBearerAuth() shouldBe true
+                document.operation("/api/v1/photos/me", "get")
+                    .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/photos", "post").requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/user/register", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/login", "post").requiresBearerAuth() shouldBe false
@@ -105,6 +107,10 @@ class OpenApiDocumentationTest(
                 document.operation(
                     "/api/v1/photos/upload-urls",
                     "post",
+                )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
+                document.operation(
+                    "/api/v1/photos/me",
+                    "get",
                 )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
                 document.operation(
                     "/api/v1/photos",
@@ -146,6 +152,12 @@ class OpenApiDocumentationTest(
                     .hasParameter("userId") shouldBe false
                 document.operation("/api/v1/photos/upload-urls", "post")
                     .hasParameter("userId") shouldBe false
+                val getMyPhotos = document.operation("/api/v1/photos/me", "get")
+                getMyPhotos.hasParameter("userId") shouldBe false
+                getMyPhotos.hasParameter("date") shouldBe true
+                getMyPhotos["parameters"].first { parameter ->
+                    parameter["name"].stringValue() == "date"
+                }["required"].booleanValue() shouldBe true
                 document.operation("/api/v1/photos", "post")
                     .hasParameter("userId") shouldBe false
             }
@@ -168,6 +180,7 @@ class OpenApiDocumentationTest(
                     "delete",
                 )
                 val issuePhotoUploadUrl = document.operation("/api/v1/photos/upload-urls", "post")
+                val getMyPhotos = document.operation("/api/v1/photos/me", "get")
                 val createPhoto = document.operation("/api/v1/photos", "post")
                 val checkAppVersion = document.operation("/init/versions", "get")
 
@@ -220,6 +233,10 @@ class OpenApiDocumentationTest(
                 issuePhotoUploadUrl.hasResponseMediaType("200", "application/json") shouldBe true
                 issuePhotoUploadUrl.hasResponseMediaType("400", "application/problem+json") shouldBe true
                 issuePhotoUploadUrl.hasResponseMediaType("404", "application/problem+json") shouldBe true
+                getMyPhotos["summary"].stringValue() shouldBe "날짜별 내 사진 조회"
+                getMyPhotos.responseCodes() shouldBe setOf("200", "400", "401")
+                getMyPhotos.hasResponseMediaType("200", "application/json") shouldBe true
+                getMyPhotos.hasResponseMediaType("400", "application/problem+json") shouldBe true
                 createPhoto["summary"].stringValue() shouldBe "사진 등록"
                 createPhoto.responseCodes() shouldBe
                     setOf("200", "400", "401", "403", "404", "409", "422")
@@ -375,6 +392,22 @@ class OpenApiDocumentationTest(
                 photoUploadUrlSchema["properties"]["expiresAt"]["type"].stringValue() shouldBe "string"
                 photoUploadUrlSchema["properties"]["expiresAt"]["format"].stringValue() shouldBe
                     "date-time"
+
+                val getMyPhotos = document.operation("/api/v1/photos/me", "get")
+                val myPhotosSchema = document.responseSchema(getMyPhotos, "200")
+                myPhotosSchema["required"].stringValues().toSet() shouldBe setOf("date", "photos")
+                myPhotosSchema["properties"].propertyNames().asSequence().toSet() shouldBe
+                    setOf("date", "photos")
+                myPhotosSchema["properties"]["date"]["format"].stringValue() shouldBe "date"
+                myPhotosSchema["properties"]["photos"]["type"].stringValue() shouldBe "array"
+                val photoSchema = schemas["PhotoResponse"]
+                photoSchema["required"].stringValues().toSet() shouldBe
+                    setOf("photoId", "downloadUrl", "contentType", "createdAt", "expiresAt")
+                photoSchema["properties"].propertyNames().asSequence().toSet() shouldBe
+                    setOf("photoId", "downloadUrl", "contentType", "createdAt", "expiresAt")
+                photoSchema["properties"]["downloadUrl"]["format"].stringValue() shouldBe "uri"
+                photoSchema["properties"]["createdAt"]["format"].stringValue() shouldBe "date-time"
+                photoSchema["properties"]["expiresAt"]["format"].stringValue() shouldBe "date-time"
 
                 schemas["PhotoCreateRequest"]["required"].stringValues().toSet() shouldBe
                     setOf("objectKey", "groupIds")
@@ -545,6 +578,12 @@ private val operationExampleExpectations = listOf(
         successSchema = "PhotoUploadUrlResponse",
     ),
     OperationExampleExpectation(
+        path = "/api/v1/photos/me",
+        method = "get",
+        success = OpenApiExample.MY_PHOTOS_RESPONSE,
+        successSchema = "MyPhotosResponse",
+    ),
+    OperationExampleExpectation(
         path = "/api/v1/photos",
         method = "post",
         request = OpenApiExample.PHOTO_CREATE_REQUEST,
@@ -705,6 +744,12 @@ private val errorResponseExpectations = listOf(
         "post",
         "404",
         setOf(ErrorCode.USER_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/photos/me",
+        "get",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
     ),
     ErrorResponseExpectation(
         "/api/v1/photos",

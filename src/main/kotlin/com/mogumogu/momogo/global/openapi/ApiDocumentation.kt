@@ -206,6 +206,22 @@ enum class OpenApiExample(
             "createdAt" to "2026-08-03T14:30:00.123456",
         ),
     ),
+    MY_PHOTOS_RESPONSE(
+        componentName = "MyPhotosResponseExample",
+        summary = "날짜별 내 사진 조회 성공 응답",
+        value = mapOf(
+            "date" to "2026-08-03",
+            "photos" to listOf(
+                mapOf(
+                    "photoId" to 501,
+                    "downloadUrl" to "https://example.r2.cloudflarestorage.com/momogo-dev/dev/users/1/2026-08-03/example.webp?X-Amz-Signature=example",
+                    "contentType" to "image/webp",
+                    "createdAt" to "2026-08-03T14:30:00.123456",
+                    "expiresAt" to "2026-08-03T14:45:00.123456",
+                ),
+            ),
+        ),
+    ),
     APP_VERSION_RESPONSE(
         componentName = "AppVersionResponseExample",
         summary = "앱 버전 체크 응답",
