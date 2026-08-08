@@ -18,6 +18,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import java.lang.reflect.Modifier
+import java.time.Instant
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -74,6 +75,58 @@ class PhotoReactionEntityTest(
                 saved.emoji shouldBe Emoji.DELICIOUS
                 saved.comment shouldBe "야르~"
                 saved.updatedAt shouldBeGreaterThanOrEqualTo saved.createdAt
+            }
+        }
+    }
+
+    given("리액션을 남긴 뒤 사진을 그룹에서 내리면") {
+        `when`("그 리액션을 다시 조회할 때") {
+            then("조회할 수 있다") {
+                val uploader = User(_nickname = "모고")
+                val reactor = User(_nickname = "모모")
+                val group = Group(
+                    _name = "리액션 그룹",
+                    _inviteCode = InviteCode(_value = "RCT200"),
+                )
+                val photo = Photo(
+                    _uploader = uploader,
+                    _objectKey = "photos/unlinked-reaction.jpg",
+                    _sizeBytes = 1_024L,
+                    _contentType = "image/jpeg",
+                )
+                entityManager.persist(uploader)
+                entityManager.persist(reactor)
+                entityManager.persist(group)
+                entityManager.persist(photo)
+                val photoGroup = PhotoGroup(_photo = photo, _group = group)
+                entityManager.persist(photoGroup)
+                entityManager.persist(
+                    PhotoReaction(
+                        _photoGroup = photoGroup,
+                        _user = reactor,
+                        _concept = ReactionConcept.YOUNG_CREATOR_CREW,
+                        _emoji = Emoji.DELICIOUS,
+                        _comment = "야르~",
+                    ),
+                )
+                entityManager.flush()
+
+                photoGroup.unlink(Instant.parse("2030-01-01T00:00:00Z"))
+                entityManager.flush()
+                entityManager.clear()
+
+                val photoGroupId = requireNotNull(photoGroup.id)
+                val reactions = entityManager
+                    .createQuery(
+                        "SELECT r FROM PhotoReaction r WHERE r._photoGroup._id = :photoGroupId",
+                        PhotoReaction::class.java,
+                    )
+                    .setParameter("photoGroupId", photoGroupId)
+                    .resultList
+
+                reactions.size shouldBe 1
+                reactions[0].comment shouldBe "야르~"
+                reactions[0].photoGroup.isActive() shouldBe false
             }
         }
     }
