@@ -3,6 +3,7 @@ package com.mogumogu.momogo.photo.application
 import com.mogumogu.momogo.global.config.ApplicationPhase
 import com.mogumogu.momogo.global.error.ApiException
 import com.mogumogu.momogo.global.error.ErrorCode
+import com.mogumogu.momogo.global.time.DailyTimeRangeFactory
 import com.mogumogu.momogo.group.domain.Group
 import com.mogumogu.momogo.group.infra.GroupMemberRepository
 import com.mogumogu.momogo.group.infra.GroupRepository
@@ -17,7 +18,6 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
-import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Service
@@ -29,6 +29,7 @@ class PhotoService(
     private val groupMemberRepository: GroupMemberRepository,
     private val objectMetadataReader: PhotoObjectMetadataReader,
     private val applicationPhase: ApplicationPhase,
+    private val dailyTimeRangeFactory: DailyTimeRangeFactory,
     private val clock: Clock,
 ) {
 
@@ -47,15 +48,13 @@ class PhotoService(
             userId = command.userId,
             groupIds = groupIds,
         )
-        val date = LocalDate.now(clock)
-        val startAt = date.atStartOfDay(clock.zone).toInstant()
-        val endAt = date.plusDays(1).atStartOfDay(clock.zone).toInstant()
+        val timeRange = dailyTimeRangeFactory.today()
         if (
             photoGroupRepository.existsUploadByUserIdAndGroupIdsAndCreatedAtRange(
                 userId = command.userId,
                 groupIds = groupIds,
-                startAt = startAt,
-                endAt = endAt,
+                startAt = timeRange.startAt,
+                endAt = timeRange.endAt,
             )
         ) {
             throw ApiException.Conflict(ErrorCode.DAILY_GROUP_UPLOAD_LIMIT_EXCEEDED)

@@ -1,15 +1,18 @@
 package com.mogumogu.momogo.photo.presentation
 
 import com.mogumogu.momogo.global.config.OpenApiConfiguration
+import com.mogumogu.momogo.global.error.ApiException
 import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.global.openapi.ApiErrors
 import com.mogumogu.momogo.global.openapi.ApiExamples
 import com.mogumogu.momogo.global.openapi.OpenApiExample
 import com.mogumogu.momogo.global.security.RequestUserId
 import com.mogumogu.momogo.photo.application.CreatePhotoCommand
+import com.mogumogu.momogo.photo.application.PhotoQueryService
 import com.mogumogu.momogo.photo.application.PhotoService
 import com.mogumogu.momogo.photo.application.PhotoUploadUrlService
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -19,15 +22,19 @@ import jakarta.validation.constraints.NotEmpty
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.Size
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.time.DateTimeException
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Tag(
     name = "사진",
-    description = "사진 업로드 API",
+    description = "사진 조회와 업로드 API",
 )
 @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
 @RestController
@@ -35,7 +42,52 @@ import java.time.LocalDateTime
 class PhotoController(
     private val photoUploadUrlService: PhotoUploadUrlService,
     private val photoService: PhotoService,
+    private val photoQueryService: PhotoQueryService,
 ) {
+
+    @Operation(
+        summary = "날짜별 내 사진 조회",
+        description = "현재 사용자가 지정한 날짜(Asia/Seoul)에 올린 사진을 최신순으로 조회합니다. 사진이 없으면 빈 목록을 반환합니다.",
+    )
+    @ApiExamples(success = OpenApiExample.MY_PHOTOS_RESPONSE)
+    @ApiErrors(badRequest = [ErrorCode.INVALID_REQUEST])
+    @GetMapping("/me")
+    fun getMyPhotos(
+        @RequestUserId
+        userId: Long,
+        @Parameter(
+            description = "사진을 조회할 날짜(Asia/Seoul)",
+            example = "2026-08-03",
+            required = true,
+            schema = Schema(type = "string", format = "date"),
+        )
+        // 누락된 date도 공통 code 필드를 포함한 INVALID_REQUEST 응답으로 변환하기 위해 nullable로 받는다.
+        @RequestParam(name = "date", required = false)
+        dateValue: String?,
+    ): MyPhotosResponse {
+        if (dateValue == null) {
+            throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
+        }
+        val date = try {
+            LocalDate.parse(dateValue)
+        } catch (_: DateTimeException) {
+            throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
+        }
+        val result = photoQueryService.getMyPhotos(userId, date)
+
+        return MyPhotosResponse(
+            date = result.date,
+            photos = result.photos.map { photo ->
+                PhotoResponse(
+                    photoId = photo.photoId,
+                    downloadUrl = photo.downloadUrl,
+                    contentType = photo.contentType,
+                    createdAt = photo.createdAt,
+                    expiresAt = photo.expiresAt,
+                )
+            },
+        )
+    }
 
     @Operation(
         summary = "사진 등록",
@@ -121,6 +173,66 @@ class PhotoController(
         )
     }
 }
+
+@Schema(description = "날짜별 내 사진 조회 응답")
+data class MyPhotosResponse(
+    @field:Schema(
+        description = "사진을 조회한 날짜(Asia/Seoul)",
+        example = "2026-08-03",
+        type = "string",
+        format = "date",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val date: LocalDate,
+
+    @field:Schema(
+        description = "해당 날짜에 올린 사진 목록. 최신순으로 정렬되며 사진이 없으면 빈 목록",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val photos: List<PhotoResponse>,
+)
+
+@Schema(description = "다운로드 가능한 사진 정보")
+data class PhotoResponse(
+    @field:Schema(
+        description = "사진 ID",
+        example = "501",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val photoId: Long,
+
+    @field:Schema(
+        description = "이미지 바이너리에 바로 접근할 수 있는 R2 presigned GET URL",
+        format = "uri",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val downloadUrl: String,
+
+    @field:Schema(
+        description = "이미지 MIME 타입",
+        example = "image/webp",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val contentType: String,
+
+    @field:Schema(
+        description = "사진이 등록된 시각(Asia/Seoul)",
+        example = "2026-08-03T14:30:00.123456",
+        type = "string",
+        format = "date-time",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val createdAt: LocalDateTime,
+
+    @field:Schema(
+        description = "다운로드 URL 만료 시각(Asia/Seoul)",
+        example = "2026-08-03T14:45:00.123456",
+        type = "string",
+        format = "date-time",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val expiresAt: LocalDateTime,
+)
 
 @Schema(description = "사진 등록 요청")
 data class PhotoCreateRequest(
