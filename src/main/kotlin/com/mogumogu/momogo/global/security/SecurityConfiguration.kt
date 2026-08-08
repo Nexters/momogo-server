@@ -21,6 +21,7 @@ class SecurityConfiguration(
             .securityMatchers { matchers ->
                 matchers
                     .requestMatchers(HttpMethod.GET, "/init/versions")
+                    .requestMatchers(HttpMethod.GET, "/init/comments")
                     .requestMatchers(HttpMethod.POST, "/api/v1/user/register")
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/login")
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/reissue")

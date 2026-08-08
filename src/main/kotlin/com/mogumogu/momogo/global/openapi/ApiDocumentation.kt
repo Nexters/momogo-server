@@ -222,6 +222,25 @@ enum class OpenApiExample(
             ),
         ),
     ),
+    INIT_COMMENTS_RESPONSE(
+        componentName = "InitCommentsResponseExample",
+        summary = "리액션 문구 조회 응답",
+        value = mapOf(
+            "revision" to "2026-08-08T14:30:00.123456",
+            "comments" to listOf(
+                mapOf(
+                    "concept" to "YOUNG_CREATOR_CREW",
+                    "emoji" to "DELICIOUS",
+                    "contents" to listOf("맛있겠다", "군침이 싹 도네"),
+                ),
+                mapOf(
+                    "concept" to "YOUNG_CREATOR_CREW",
+                    "emoji" to "HMM",
+                    "contents" to listOf("음..."),
+                ),
+            ),
+        ),
+    ),
     APP_VERSION_RESPONSE(
         componentName = "AppVersionResponseExample",
         summary = "앱 버전 체크 응답",

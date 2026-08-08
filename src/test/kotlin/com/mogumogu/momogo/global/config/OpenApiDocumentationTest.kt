@@ -78,6 +78,7 @@ class OpenApiDocumentationTest(
                 document.operation("/api/v1/auth/reissue", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/logout", "delete").requiresBearerAuth() shouldBe false
                 document.operation("/init/versions", "get").requiresBearerAuth() shouldBe false
+                document.operation("/init/comments", "get").requiresBearerAuth() shouldBe false
             }
 
             then("Bearer 인증 API에 공통 401 응답을 적용한다") {
@@ -183,6 +184,7 @@ class OpenApiDocumentationTest(
                 val getMyPhotos = document.operation("/api/v1/photos/me", "get")
                 val createPhoto = document.operation("/api/v1/photos", "post")
                 val checkAppVersion = document.operation("/init/versions", "get")
+                val getReactionComments = document.operation("/init/comments", "get")
 
                 register["summary"].stringValue() shouldBe "회원가입"
                 register.responseCodes() shouldBe setOf("200", "400", "409")
@@ -250,6 +252,9 @@ class OpenApiDocumentationTest(
                 checkAppVersion.responseCodes() shouldBe setOf("200", "400")
                 checkAppVersion.hasResponseMediaType("200", "application/json") shouldBe true
                 checkAppVersion.hasResponseMediaType("400", "application/problem+json") shouldBe true
+                getReactionComments["summary"].stringValue() shouldBe "리액션 문구 조회"
+                getReactionComments.responseCodes() shouldBe setOf("200")
+                getReactionComments.hasResponseMediaType("200", "application/json") shouldBe true
             }
 
             then("재사용 가능한 요청과 성공 응답 예시를 components에 제공한다") {
@@ -596,6 +601,12 @@ private val operationExampleExpectations = listOf(
         method = "get",
         success = OpenApiExample.APP_VERSION_RESPONSE,
         successSchema = "AppVersionResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/init/comments",
+        method = "get",
+        success = OpenApiExample.INIT_COMMENTS_RESPONSE,
+        successSchema = "ReactionCommentsResponse",
     ),
 )
 
