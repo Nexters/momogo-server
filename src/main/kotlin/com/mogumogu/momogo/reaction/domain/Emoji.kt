@@ -2,7 +2,7 @@ package com.mogumogu.momogo.reaction.domain
 
 enum class Emoji {
     DELICIOUS,
-    SEXY,
+    HOT,
     FLEX,
     HMM,
 }

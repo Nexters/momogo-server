@@ -78,7 +78,7 @@ class ReactionCommentApiIntegrationTest(
                 )["revision"].stringValue()
 
             val previousRevision = requestRevision()
-            reactionCommentRepository.save(createReactionComment(Emoji.SEXY, "이건 못 참지"))
+            reactionCommentRepository.save(createReactionComment(Emoji.HOT, "이건 못 참지"))
 
             then("revision이 변경되어 캐시 갱신을 알 수 있다") {
                 requestRevision() shouldNotBe previousRevision
