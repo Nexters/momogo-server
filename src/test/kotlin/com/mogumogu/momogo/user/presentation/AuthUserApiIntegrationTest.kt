@@ -11,6 +11,10 @@ import com.mogumogu.momogo.group.infra.GroupRepository
 import com.mogumogu.momogo.photo.domain.Photo
 import com.mogumogu.momogo.photo.domain.PhotoGroup
 import com.mogumogu.momogo.photo.infra.PhotoGroupRepository
+import com.mogumogu.momogo.reaction.domain.Emoji
+import com.mogumogu.momogo.reaction.domain.PhotoReaction
+import com.mogumogu.momogo.reaction.domain.ReactionConcept
+import com.mogumogu.momogo.reaction.infra.PhotoReactionRepository
 import com.mogumogu.momogo.photo.infra.PhotoRepository
 import com.mogumogu.momogo.user.domain.LoginProvider
 import com.mogumogu.momogo.user.domain.RefreshToken
@@ -57,6 +61,7 @@ class AuthUserApiIntegrationTest(
     private val groupMemberRepository: GroupMemberRepository,
     private val photoRepository: PhotoRepository,
     private val photoGroupRepository: PhotoGroupRepository,
+    private val photoReactionRepository: PhotoReactionRepository,
     private val refreshTokenProvider: RefreshTokenProvider,
     private val jwtEncoder: JwtEncoder,
     private val jwtDecoder: JwtDecoder,
@@ -67,6 +72,7 @@ class AuthUserApiIntegrationTest(
     testExecutionMode = TestExecutionMode.Sequential
 
     fun cleanDatabase() {
+        photoReactionRepository.deleteAllInBatch()
         photoGroupRepository.deleteAllInBatch()
         photoRepository.deleteAllInBatch()
         groupMemberRepository.deleteAllInBatch()
@@ -725,6 +731,15 @@ class AuthUserApiIntegrationTest(
                     PhotoGroup(_photo = photo, _group = group),
                 )
                 val photoGroupId = requireNotNull(photoGroup.id)
+                photoReactionRepository.saveAndFlush(
+                    PhotoReaction(
+                        _photoGroup = photoGroup,
+                        _user = user,
+                        _concept = ReactionConcept.YOUNG_CREATOR_CREW,
+                        _emoji = Emoji.DELICIOUS,
+                        _comment = "야르~",
+                    ),
+                )
 
                 val response = withdraw(accessToken)
 
@@ -738,6 +753,7 @@ class AuthUserApiIntegrationTest(
                 val deletedGroup = groupRepository.findById(requireNotNull(group.id)).orElseThrow()
                 deletedGroup.deletedAt shouldNotBe null
                 deletedGroup.isActive() shouldBe false
+                photoReactionRepository.count() shouldBe 0L
                 photoRepository.count() shouldBe 1L
                 val remainingPhoto = photoRepository.findById(photoId).orElseThrow()
                 remainingPhoto.uploader shouldBe null

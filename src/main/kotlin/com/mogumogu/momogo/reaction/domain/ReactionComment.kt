@@ -59,7 +59,7 @@ class ReactionComment(
         validateContent(_content)
     }
 
-    private companion object {
+    companion object {
         const val CONTENT_MAX_LENGTH = 30
 
         fun validateContent(content: String) {

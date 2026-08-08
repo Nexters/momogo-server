@@ -5,6 +5,7 @@ import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.group.infra.GroupMemberRepository
 import com.mogumogu.momogo.group.infra.GroupRepository
 import com.mogumogu.momogo.photo.infra.PhotoRepository
+import com.mogumogu.momogo.reaction.infra.PhotoReactionRepository
 import com.mogumogu.momogo.user.domain.User
 import com.mogumogu.momogo.user.infra.LoginAccountRepository
 import com.mogumogu.momogo.user.infra.RefreshTokenRepository
@@ -21,6 +22,7 @@ class UserService(
     private val groupMemberRepository: GroupMemberRepository,
     private val groupRepository: GroupRepository,
     private val photoRepository: PhotoRepository,
+    private val photoReactionRepository: PhotoReactionRepository,
     private val clock: Clock,
 ) {
 
@@ -67,6 +69,8 @@ class UserService(
                 }
             }
 
+        photoReactionRepository.deleteAllByUserId(userId)
+        photoReactionRepository.flush()
         groupMemberRepository.deleteAllByUserId(userId)
         groupMemberRepository.flush()
         refreshTokenRepository.deleteAllByUser_Id(userId)
