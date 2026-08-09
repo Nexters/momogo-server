@@ -54,6 +54,9 @@ enum class ErrorCode(
     DAILY_GROUP_UPLOAD_LIMIT_EXCEEDED(
         message = "오늘 이미 사진을 업로드한 그룹이 있습니다.",
     ),
+    REACTION_NOT_FOUND(
+        message = "리액션을 찾을 수 없습니다.",
+    ),
     OBJECT_NOT_UPLOADED(
         message = "업로드된 사진 파일을 찾을 수 없습니다.",
     ),

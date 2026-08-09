@@ -7,6 +7,7 @@ import com.mogumogu.momogo.global.openapi.ApiExamples
 import com.mogumogu.momogo.global.openapi.OpenApiExample
 import com.mogumogu.momogo.global.security.RequestUserId
 import com.mogumogu.momogo.reaction.application.CreatePhotoReactionCommand
+import com.mogumogu.momogo.reaction.application.DeletePhotoReactionCommand
 import com.mogumogu.momogo.reaction.application.PhotoReactionService
 import com.mogumogu.momogo.reaction.domain.Emoji
 import com.mogumogu.momogo.reaction.domain.ReactionComment
@@ -20,6 +21,7 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.Size
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -87,6 +89,36 @@ class PhotoReactionController(
             comment = result.comment,
             createdAt = result.createdAt,
         )
+    }
+
+    @Operation(
+        summary = "사진 리액션 삭제",
+        description = "내가 남긴 리액션을 지웁니다. 그룹에서 내린 사진에 남긴 리액션도 지울 수 있습니다.",
+    )
+    @ApiExamples(success = OpenApiExample.EMPTY_OBJECT_RESPONSE)
+    @ApiErrors(
+        forbidden = [ErrorCode.FORBIDDEN],
+        notFound = [ErrorCode.REACTION_NOT_FOUND],
+    )
+    @DeleteMapping("/{photoId}/reactions/{reactionId}")
+    fun delete(
+        @RequestUserId
+        userId: Long,
+        @Parameter(example = "501")
+        @PathVariable
+        photoId: Long,
+        @Parameter(example = "901")
+        @PathVariable
+        reactionId: Long,
+    ): Map<String, Any> {
+        photoReactionService.delete(
+            DeletePhotoReactionCommand(
+                userId = userId,
+                photoId = photoId,
+                reactionId = reactionId,
+            ),
+        )
+        return emptyMap()
     }
 }
 
