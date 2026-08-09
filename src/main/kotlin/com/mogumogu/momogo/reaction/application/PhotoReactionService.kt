@@ -65,7 +65,26 @@ class PhotoReactionService(
             createdAt = LocalDateTime.ofInstant(photoReaction.createdAt, clock.zone),
         )
     }
+
+    @Transactional
+    fun delete(command: DeletePhotoReactionCommand) {
+        val photoReaction = photoReactionRepository.findByIdAndPhotoId(
+            reactionId = command.reactionId,
+            photoId = command.photoId,
+        ) ?: throw ApiException.NotFound(ErrorCode.REACTION_NOT_FOUND)
+        if (!photoReaction.isOwnedBy(command.userId)) {
+            throw ApiException.Forbidden(ErrorCode.FORBIDDEN)
+        }
+
+        photoReactionRepository.delete(photoReaction)
+    }
 }
+
+data class DeletePhotoReactionCommand(
+    val userId: Long,
+    val photoId: Long,
+    val reactionId: Long,
+)
 
 data class CreatePhotoReactionCommand(
     val userId: Long,

@@ -86,6 +86,8 @@ class PhotoReaction(
     val comment: String
         get() = _comment
 
+    fun isOwnedBy(userId: Long): Boolean = _user.id == userId
+
     init {
         // 문구는 reaction_comment에 등록된 값을 그대로 복사해 두므로 같은 규칙으로 검증한다.
         ReactionComment.validateContent(_comment)
