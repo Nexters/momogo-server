@@ -45,6 +45,9 @@ enum class ErrorCode(
     NOT_GROUP_MEMBER(
         message = "그룹 멤버가 아닙니다.",
     ),
+    PHOTO_NOT_FOUND(
+        message = "사진을 찾을 수 없습니다.",
+    ),
     PHOTO_ALREADY_REGISTERED(
         message = "이미 등록된 사진입니다.",
     ),
