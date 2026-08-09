@@ -24,6 +24,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.transaction.support.TransactionTemplate
 import tools.jackson.databind.ObjectMapper
@@ -114,17 +115,48 @@ class PhotoReactionApiIntegrationTest(
         comment: String = "야르~",
     ): MockHttpServletResponse =
         performJson(
-            post("/api/v1/photos/$photoId/reactions")
+            post("/api/v1/groups/$groupId/photos/$photoId/reactions")
                 .header("Authorization", "Bearer $accessToken"),
             json(
                 mapOf(
-                    "groupId" to groupId,
                     "concept" to "YOUNG_CREATOR_CREW",
                     "emoji" to emoji,
                     "comment" to comment,
                 ),
             ),
         )
+
+    fun createGroupWithCode(accessToken: String): Pair<Long, String> {
+        val response = performJson(
+            post("/api/v1/groups").header("Authorization", "Bearer $accessToken"),
+            json(mapOf("name" to "리액션 그룹")),
+        )
+        response.status shouldBe HttpStatus.OK.value()
+        val body = objectMapper.readTree(response.contentAsString)
+
+        return body["groupId"].longValue() to body["inviteCode"].stringValue()
+    }
+
+    fun joinGroup(
+        accessToken: String,
+        inviteCode: String,
+    ) {
+        val response = performJson(
+            post("/api/v1/groups/invitations").header("Authorization", "Bearer $accessToken"),
+            json(mapOf("code" to inviteCode)),
+        )
+        response.status shouldBe HttpStatus.OK.value()
+    }
+
+    fun getReactions(
+        accessToken: String,
+        photoId: Long,
+        groupId: Long,
+    ): MockHttpServletResponse =
+        mockMvc.perform(
+            get("/api/v1/groups/$groupId/photos/$photoId/reactions")
+                .header("Authorization", "Bearer $accessToken"),
+        ).andReturn().response
 
     fun reactionIdOf(response: MockHttpServletResponse): Long {
         response.status shouldBe HttpStatus.OK.value()
@@ -135,10 +167,11 @@ class PhotoReactionApiIntegrationTest(
     fun deleteReaction(
         accessToken: String,
         photoId: Long,
+        groupId: Long,
         reactionId: Long,
     ): MockHttpServletResponse =
         mockMvc.perform(
-            delete("/api/v1/photos/$photoId/reactions/$reactionId")
+            delete("/api/v1/groups/$groupId/photos/$photoId/reactions/$reactionId")
                 .header("Authorization", "Bearer $accessToken"),
         ).andReturn().response
 
@@ -247,6 +280,163 @@ class PhotoReactionApiIntegrationTest(
         }
     }
 
+    given("여러 사람이 리액션을 남긴 사진이 있으면") {
+        `when`("리액션을 조회할 때") {
+            then("등록순으로 작성자 정보와 함께 반환한다") {
+                val owner = register()
+                val (groupId, inviteCode) = createGroupWithCode(owner.accessToken)
+                val mate = register()
+                joinGroup(mate.accessToken, inviteCode)
+                val photoGroup = uploadPhoto(owner.userId, groupId)
+                val photoId = requireNotNull(photoGroup.photo.id)
+                react(owner.accessToken, photoId, groupId, comment = "야르~")
+                react(mate.accessToken, photoId, groupId, emoji = "HOT", comment = "매워보여")
+
+                val response = getReactions(owner.accessToken, photoId, groupId)
+
+                response.status shouldBe HttpStatus.OK.value()
+                response.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
+                val body = objectMapper.readTree(response.contentAsString)
+                body["photoId"].longValue() shouldBe photoId
+                body["groupId"].longValue() shouldBe groupId
+
+                val reactions = body["reactions"]
+                reactions.size() shouldBe 2
+                reactions[0].propertyNames().toSet() shouldBe setOf(
+                    "reactionId",
+                    "userId",
+                    "nickname",
+                    "concept",
+                    "emoji",
+                    "comment",
+                    "createdAt",
+                    "mine",
+                )
+                reactions[0]["userId"].longValue() shouldBe owner.userId
+                reactions[0]["nickname"].stringValue() shouldBe "모모"
+                reactions[0]["emoji"].stringValue() shouldBe "DELICIOUS"
+                reactions[0]["comment"].stringValue() shouldBe "야르~"
+                reactions[0]["mine"].booleanValue() shouldBe true
+                reactions[1]["userId"].longValue() shouldBe mate.userId
+                reactions[1]["emoji"].stringValue() shouldBe "HOT"
+                reactions[1]["mine"].booleanValue() shouldBe false
+            }
+        }
+
+        `when`("그룹 멤버가 아닌 사용자가 조회할 때") {
+            then("403으로 거절한다") {
+                val owner = register()
+                val outsider = register()
+                val groupId = createGroup(owner.accessToken)
+                val photoGroup = uploadPhoto(owner.userId, groupId)
+                val photoId = requireNotNull(photoGroup.photo.id)
+                react(owner.accessToken, photoId, groupId)
+
+                assertProblem(
+                    response = getReactions(outsider.accessToken, photoId, groupId),
+                    status = HttpStatus.FORBIDDEN,
+                    errorCode = ErrorCode.NOT_GROUP_MEMBER,
+                )
+            }
+        }
+
+    }
+
+    given("내가 남긴 리액션이 있으면") {
+        `when`("리액션을 삭제할 때") {
+            then("리액션을 지우고 빈 객체를 반환한다") {
+                val user = register()
+                val groupId = createGroup(user.accessToken)
+                val photoGroup = uploadPhoto(user.userId, groupId)
+                val photoId = requireNotNull(photoGroup.photo.id)
+                val reactionId = reactionIdOf(react(user.accessToken, photoId, groupId))
+
+                val response = deleteReaction(user.accessToken, photoId, groupId, reactionId)
+
+                response.status shouldBe HttpStatus.OK.value()
+                response.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
+                response.contentAsString shouldBe "{}"
+                photoReactionRepository.existsById(reactionId) shouldBe false
+            }
+        }
+
+        `when`("다른 사용자가 그 리액션을 삭제할 때") {
+            then("403으로 거절하고 리액션을 남겨 둔다") {
+                val owner = register()
+                val (groupId, inviteCode) = createGroupWithCode(owner.accessToken)
+                val mate = register()
+                joinGroup(mate.accessToken, inviteCode)
+                val photoGroup = uploadPhoto(owner.userId, groupId)
+                val photoId = requireNotNull(photoGroup.photo.id)
+                val reactionId = reactionIdOf(react(owner.accessToken, photoId, groupId))
+
+                assertProblem(
+                    response = deleteReaction(mate.accessToken, photoId, groupId, reactionId),
+                    status = HttpStatus.FORBIDDEN,
+                    errorCode = ErrorCode.FORBIDDEN,
+                )
+                photoReactionRepository.existsById(reactionId) shouldBe true
+            }
+        }
+
+        `when`("다른 사진의 경로로 삭제를 요청할 때") {
+            then("404로 거절한다") {
+                val user = register()
+                val groupId = createGroup(user.accessToken)
+                val photoGroup = uploadPhoto(user.userId, groupId)
+                val otherPhotoGroup = uploadPhoto(user.userId, groupId)
+                val photoId = requireNotNull(photoGroup.photo.id)
+                val otherPhotoId = requireNotNull(otherPhotoGroup.photo.id)
+                val reactionId = reactionIdOf(react(user.accessToken, photoId, groupId))
+
+                assertProblem(
+                    response = deleteReaction(user.accessToken, otherPhotoId, groupId, reactionId),
+                    status = HttpStatus.NOT_FOUND,
+                    errorCode = ErrorCode.REACTION_NOT_FOUND,
+                )
+                photoReactionRepository.existsById(reactionId) shouldBe true
+            }
+        }
+    }
+
+    given("없는 리액션이면") {
+        `when`("삭제를 요청할 때") {
+            then("404로 거절한다") {
+                val user = register()
+                val groupId = createGroup(user.accessToken)
+                val photoGroup = uploadPhoto(user.userId, groupId)
+                val photoId = requireNotNull(photoGroup.photo.id)
+
+                assertProblem(
+                    response = deleteReaction(
+                        user.accessToken,
+                        photoId,
+                        groupId,
+                        reactionId = 999_999L,
+                    ),
+                    status = HttpStatus.NOT_FOUND,
+                    errorCode = ErrorCode.REACTION_NOT_FOUND,
+                )
+            }
+        }
+    }
+
+    given("리액션이 없는 사진이면") {
+        `when`("리액션을 조회할 때") {
+            then("빈 목록을 반환한다") {
+                val user = register()
+                val groupId = createGroup(user.accessToken)
+                val photoGroup = uploadPhoto(user.userId, groupId)
+                val photoId = requireNotNull(photoGroup.photo.id)
+
+                val response = getReactions(user.accessToken, photoId, groupId)
+
+                response.status shouldBe HttpStatus.OK.value()
+                objectMapper.readTree(response.contentAsString)["reactions"].size() shouldBe 0
+            }
+        }
+    }
+
     given("그룹에 없는 사진이면") {
         `when`("리액션을 남길 때") {
             then("404로 거절한다") {
@@ -255,6 +445,19 @@ class PhotoReactionApiIntegrationTest(
 
                 assertProblem(
                     response = react(user.accessToken, photoId = 999_999L, groupId = groupId),
+                    status = HttpStatus.NOT_FOUND,
+                    errorCode = ErrorCode.PHOTO_NOT_FOUND,
+                )
+            }
+        }
+
+        `when`("리액션을 조회할 때") {
+            then("404로 거절한다") {
+                val user = register()
+                val groupId = createGroup(user.accessToken)
+
+                assertProblem(
+                    response = getReactions(user.accessToken, photoId = 999_999L, groupId = groupId),
                     status = HttpStatus.NOT_FOUND,
                     errorCode = ErrorCode.PHOTO_NOT_FOUND,
                 )
@@ -280,7 +483,7 @@ class PhotoReactionApiIntegrationTest(
             }
         }
 
-        `when`("이미 남긴 리액션을 삭제할 때") {
+        `when`("이미 남긴 리액션을 지울 때") {
             then("삭제를 허용한다") {
                 val user = register()
                 val groupId = createGroup(user.accessToken)
@@ -290,83 +493,10 @@ class PhotoReactionApiIntegrationTest(
                 photoGroup.unlink(Instant.parse("2030-01-01T00:00:00Z"))
                 photoGroupRepository.saveAndFlush(photoGroup)
 
-                val response = deleteReaction(user.accessToken, photoId, reactionId)
+                val response = deleteReaction(user.accessToken, photoId, groupId, reactionId)
 
                 response.status shouldBe HttpStatus.OK.value()
                 photoReactionRepository.existsById(reactionId) shouldBe false
-            }
-        }
-    }
-
-    given("내가 남긴 리액션이 있으면") {
-        `when`("리액션을 삭제할 때") {
-            then("리액션을 지우고 빈 객체를 반환한다") {
-                val user = register()
-                val groupId = createGroup(user.accessToken)
-                val photoGroup = uploadPhoto(user.userId, groupId)
-                val photoId = requireNotNull(photoGroup.photo.id)
-                val reactionId = reactionIdOf(react(user.accessToken, photoId, groupId))
-
-                val response = deleteReaction(user.accessToken, photoId, reactionId)
-
-                response.status shouldBe HttpStatus.OK.value()
-                response.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
-                response.contentAsString shouldBe "{}"
-                photoReactionRepository.existsById(reactionId) shouldBe false
-            }
-        }
-
-        `when`("다른 사용자가 그 리액션을 삭제할 때") {
-            then("403으로 거절하고 리액션을 남겨 둔다") {
-                val owner = register()
-                val other = register()
-                val groupId = createGroup(owner.accessToken)
-                val photoGroup = uploadPhoto(owner.userId, groupId)
-                val photoId = requireNotNull(photoGroup.photo.id)
-                val reactionId = reactionIdOf(react(owner.accessToken, photoId, groupId))
-
-                assertProblem(
-                    response = deleteReaction(other.accessToken, photoId, reactionId),
-                    status = HttpStatus.FORBIDDEN,
-                    errorCode = ErrorCode.FORBIDDEN,
-                )
-                photoReactionRepository.existsById(reactionId) shouldBe true
-            }
-        }
-
-        `when`("다른 사진의 경로로 삭제를 요청할 때") {
-            then("404로 거절한다") {
-                val user = register()
-                val groupId = createGroup(user.accessToken)
-                val photoGroup = uploadPhoto(user.userId, groupId)
-                val otherPhotoGroup = uploadPhoto(user.userId, groupId)
-                val photoId = requireNotNull(photoGroup.photo.id)
-                val otherPhotoId = requireNotNull(otherPhotoGroup.photo.id)
-                val reactionId = reactionIdOf(react(user.accessToken, photoId, groupId))
-
-                assertProblem(
-                    response = deleteReaction(user.accessToken, otherPhotoId, reactionId),
-                    status = HttpStatus.NOT_FOUND,
-                    errorCode = ErrorCode.REACTION_NOT_FOUND,
-                )
-                photoReactionRepository.existsById(reactionId) shouldBe true
-            }
-        }
-    }
-
-    given("없는 리액션이면") {
-        `when`("삭제를 요청할 때") {
-            then("404로 거절한다") {
-                val user = register()
-                val groupId = createGroup(user.accessToken)
-                val photoGroup = uploadPhoto(user.userId, groupId)
-                val photoId = requireNotNull(photoGroup.photo.id)
-
-                assertProblem(
-                    response = deleteReaction(user.accessToken, photoId, reactionId = 999_999L),
-                    status = HttpStatus.NOT_FOUND,
-                    errorCode = ErrorCode.REACTION_NOT_FOUND,
-                )
             }
         }
     }

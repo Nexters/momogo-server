@@ -222,11 +222,40 @@ enum class OpenApiExample(
             ),
         ),
     ),
+    PHOTO_REACTIONS_RESPONSE(
+        componentName = "PhotoReactionsResponseExample",
+        summary = "사진 리액션 조회 성공 응답",
+        value = mapOf(
+            "photoId" to 501,
+            "groupId" to 10,
+            "reactions" to listOf(
+                mapOf(
+                    "reactionId" to 901,
+                    "userId" to 1,
+                    "nickname" to "모모",
+                    "concept" to "YOUNG_CREATOR_CREW",
+                    "emoji" to "DELICIOUS",
+                    "comment" to "야르~",
+                    "createdAt" to "2026-08-08T14:30:00.123456",
+                    "mine" to true,
+                ),
+                mapOf(
+                    "reactionId" to 902,
+                    "userId" to 2,
+                    "nickname" to "모고",
+                    "concept" to "YOUNG_CREATOR_CREW",
+                    "emoji" to "HOT",
+                    "comment" to "매워보여",
+                    "createdAt" to "2026-08-08T14:31:00.123456",
+                    "mine" to false,
+                ),
+            ),
+        ),
+    ),
     PHOTO_REACTION_CREATE_REQUEST(
         componentName = "PhotoReactionCreateRequestExample",
         summary = "사진 리액션 등록 요청",
         value = mapOf(
-            "groupId" to 10,
             "concept" to "YOUNG_CREATOR_CREW",
             "emoji" to "DELICIOUS",
             "comment" to "야르~",

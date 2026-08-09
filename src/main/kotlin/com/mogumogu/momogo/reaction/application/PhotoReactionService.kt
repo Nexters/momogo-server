@@ -25,15 +25,10 @@ class PhotoReactionService(
 
     @Transactional
     fun create(command: CreatePhotoReactionCommand): CreatePhotoReactionResult {
-        // 그룹 멤버가 아닌 사용자에게 사진의 존재 여부를 알려주지 않도록 멤버십을 먼저 확인한다.
-        if (
-            groupMemberRepository.findJoinedGroupIdsByUserIdAndGroupIds(
-                userId = command.userId,
-                groupIds = listOf(command.groupId),
-            ).isEmpty()
-        ) {
-            throw ApiException.Forbidden(ErrorCode.NOT_GROUP_MEMBER)
-        }
+        ensureJoinedGroup(
+            userId = command.userId,
+            groupId = command.groupId,
+        )
 
         val photoGroup = photoGroupRepository.findActiveByPhotoIdAndGroupId(
             photoId = command.photoId,
@@ -66,11 +61,50 @@ class PhotoReactionService(
         )
     }
 
+    @Transactional(readOnly = true)
+    fun getReactions(command: GetPhotoReactionsCommand): PhotoReactionsResult {
+        ensureJoinedGroup(
+            userId = command.userId,
+            groupId = command.groupId,
+        )
+        if (
+            photoGroupRepository.findActiveByPhotoIdAndGroupId(
+                photoId = command.photoId,
+                groupId = command.groupId,
+            ) == null
+        ) {
+            throw ApiException.NotFound(ErrorCode.PHOTO_NOT_FOUND)
+        }
+
+        val reactions = photoReactionRepository.findAllByPhotoIdAndGroupId(
+            photoId = command.photoId,
+            groupId = command.groupId,
+        )
+
+        return PhotoReactionsResult(
+            photoId = command.photoId,
+            groupId = command.groupId,
+            reactions = reactions.map { reaction ->
+                PhotoReactionResult(
+                    reactionId = reaction.reactionId,
+                    userId = reaction.userId,
+                    nickname = reaction.nickname,
+                    concept = reaction.concept,
+                    emoji = reaction.emoji,
+                    comment = reaction.comment,
+                    createdAt = LocalDateTime.ofInstant(reaction.createdAt, clock.zone),
+                    mine = reaction.userId == command.userId,
+                )
+            },
+        )
+    }
+
     @Transactional
     fun delete(command: DeletePhotoReactionCommand) {
-        val photoReaction = photoReactionRepository.findByIdAndPhotoId(
+        val photoReaction = photoReactionRepository.findByIdAndPhotoIdAndGroupId(
             reactionId = command.reactionId,
             photoId = command.photoId,
+            groupId = command.groupId,
         ) ?: throw ApiException.NotFound(ErrorCode.REACTION_NOT_FOUND)
         if (!photoReaction.isOwnedBy(command.userId)) {
             throw ApiException.Forbidden(ErrorCode.FORBIDDEN)
@@ -78,12 +112,51 @@ class PhotoReactionService(
 
         photoReactionRepository.delete(photoReaction)
     }
+
+    // 그룹 멤버가 아닌 사용자에게 사진의 존재 여부를 알려주지 않도록 멤버십을 먼저 확인한다.
+    private fun ensureJoinedGroup(
+        userId: Long,
+        groupId: Long,
+    ) {
+        if (
+            groupMemberRepository.findJoinedGroupIdsByUserIdAndGroupIds(
+                userId = userId,
+                groupIds = listOf(groupId),
+            ).isEmpty()
+        ) {
+            throw ApiException.Forbidden(ErrorCode.NOT_GROUP_MEMBER)
+        }
+    }
 }
 
 data class DeletePhotoReactionCommand(
     val userId: Long,
     val photoId: Long,
+    val groupId: Long,
     val reactionId: Long,
+)
+
+data class GetPhotoReactionsCommand(
+    val userId: Long,
+    val photoId: Long,
+    val groupId: Long,
+)
+
+data class PhotoReactionsResult(
+    val photoId: Long,
+    val groupId: Long,
+    val reactions: List<PhotoReactionResult>,
+)
+
+data class PhotoReactionResult(
+    val reactionId: Long,
+    val userId: Long,
+    val nickname: String,
+    val concept: ReactionConcept,
+    val emoji: Emoji,
+    val comment: String,
+    val createdAt: LocalDateTime,
+    val mine: Boolean,
 )
 
 data class CreatePhotoReactionCommand(
