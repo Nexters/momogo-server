@@ -9,6 +9,22 @@ import java.time.Instant
 interface PhotoGroupRepository : JpaRepository<PhotoGroup, Long> {
     @Query(
         """
+        SELECT pg
+        FROM PhotoGroup pg
+        WHERE pg._photo._id = :photoId
+          AND pg._group._id = :groupId
+          AND pg._deletedAt IS NULL
+        """,
+    )
+    fun findActiveByPhotoIdAndGroupId(
+        @Param("photoId")
+        photoId: Long,
+        @Param("groupId")
+        groupId: Long,
+    ): PhotoGroup?
+
+    @Query(
+        """
         SELECT new com.mogumogu.momogo.photo.infra.TodayPhotoUploaderCount(
             pg._group._id,
             COUNT(DISTINCT uploader._id)

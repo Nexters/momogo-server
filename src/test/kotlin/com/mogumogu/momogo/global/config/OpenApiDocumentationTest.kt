@@ -73,6 +73,8 @@ class OpenApiDocumentationTest(
                 document.operation("/api/v1/photos/me", "get")
                     .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/photos", "post").requiresBearerAuth() shouldBe true
+                document.operation("/api/v1/photos/{photoId}/reactions", "post")
+                    .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/user/register", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/login", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/reissue", "post").requiresBearerAuth() shouldBe false
@@ -115,6 +117,10 @@ class OpenApiDocumentationTest(
                 )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
                 document.operation(
                     "/api/v1/photos",
+                    "post",
+                )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
+                document.operation(
+                    "/api/v1/photos/{photoId}/reactions",
                     "post",
                 )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
 
@@ -183,6 +189,10 @@ class OpenApiDocumentationTest(
                 val issuePhotoUploadUrl = document.operation("/api/v1/photos/upload-urls", "post")
                 val getMyPhotos = document.operation("/api/v1/photos/me", "get")
                 val createPhoto = document.operation("/api/v1/photos", "post")
+                val createPhotoReaction = document.operation(
+                    "/api/v1/photos/{photoId}/reactions",
+                    "post",
+                )
                 val checkAppVersion = document.operation("/init/versions", "get")
                 val getReactionComments = document.operation("/init/comments", "get")
 
@@ -248,6 +258,12 @@ class OpenApiDocumentationTest(
                 createPhoto.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 createPhoto.hasResponseMediaType("409", "application/problem+json") shouldBe true
                 createPhoto.hasResponseMediaType("422", "application/problem+json") shouldBe true
+                createPhotoReaction["summary"].stringValue() shouldBe "사진 리액션 등록"
+                createPhotoReaction.responseCodes() shouldBe setOf("200", "400", "401", "403", "404")
+                createPhotoReaction.hasResponseMediaType("200", "application/json") shouldBe true
+                createPhotoReaction.hasResponseMediaType("400", "application/problem+json") shouldBe true
+                createPhotoReaction.hasResponseMediaType("403", "application/problem+json") shouldBe true
+                createPhotoReaction.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 checkAppVersion["summary"].stringValue() shouldBe "앱 버전 체크"
                 checkAppVersion.responseCodes() shouldBe setOf("200", "400")
                 checkAppVersion.hasResponseMediaType("200", "application/json") shouldBe true
@@ -608,6 +624,14 @@ private val operationExampleExpectations = listOf(
         success = OpenApiExample.INIT_COMMENTS_RESPONSE,
         successSchema = "ReactionCommentsResponse",
     ),
+    OperationExampleExpectation(
+        path = "/api/v1/photos/{photoId}/reactions",
+        method = "post",
+        request = OpenApiExample.PHOTO_REACTION_CREATE_REQUEST,
+        requestSchema = "PhotoReactionCreateRequest",
+        success = OpenApiExample.PHOTO_REACTION_CREATE_RESPONSE,
+        successSchema = "PhotoReactionCreateResponse",
+    ),
 )
 
 private data class ErrorResponseExpectation(
@@ -800,6 +824,18 @@ private val errorResponseExpectations = listOf(
         "get",
         "400",
         setOf(ErrorCode.INVALID_PLATFORM, ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/photos/{photoId}/reactions",
+        "post",
+        "403",
+        setOf(ErrorCode.NOT_GROUP_MEMBER),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/photos/{photoId}/reactions",
+        "post",
+        "404",
+        setOf(ErrorCode.PHOTO_NOT_FOUND, ErrorCode.USER_NOT_FOUND),
     ),
 )
 
