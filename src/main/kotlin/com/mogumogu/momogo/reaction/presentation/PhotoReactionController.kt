@@ -48,6 +48,7 @@ class PhotoReactionController(
     )
     @ApiExamples(success = OpenApiExample.PHOTO_REACTIONS_RESPONSE)
     @ApiErrors(
+        badRequest = [ErrorCode.INVALID_REQUEST],
         forbidden = [ErrorCode.NOT_GROUP_MEMBER],
         notFound = [ErrorCode.PHOTO_NOT_FOUND],
     )
@@ -148,6 +149,7 @@ class PhotoReactionController(
     )
     @ApiExamples(success = OpenApiExample.EMPTY_OBJECT_RESPONSE)
     @ApiErrors(
+        badRequest = [ErrorCode.INVALID_REQUEST],
         forbidden = [ErrorCode.FORBIDDEN],
         notFound = [ErrorCode.REACTION_NOT_FOUND],
     )

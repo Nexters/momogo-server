@@ -277,8 +277,9 @@ class OpenApiDocumentationTest(
                     "get",
                 )
                 getPhotoReactions["summary"].stringValue() shouldBe "사진 리액션 조회"
-                getPhotoReactions.responseCodes() shouldBe setOf("200", "401", "403", "404")
+                getPhotoReactions.responseCodes() shouldBe setOf("200", "400", "401", "403", "404")
                 getPhotoReactions.hasResponseMediaType("200", "application/json") shouldBe true
+                getPhotoReactions.hasResponseMediaType("400", "application/problem+json") shouldBe true
                 getPhotoReactions.hasResponseMediaType("403", "application/problem+json") shouldBe true
                 getPhotoReactions.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 getPhotoReactions.parameter("groupId")["example"].intValue() shouldBe 10
@@ -288,8 +289,10 @@ class OpenApiDocumentationTest(
                     "delete",
                 )
                 deletePhotoReaction["summary"].stringValue() shouldBe "사진 리액션 삭제"
-                deletePhotoReaction.responseCodes() shouldBe setOf("200", "401", "403", "404")
+                deletePhotoReaction.responseCodes() shouldBe
+                    setOf("200", "400", "401", "403", "404")
                 deletePhotoReaction.hasResponseMediaType("200", "application/json") shouldBe true
+                deletePhotoReaction.hasResponseMediaType("400", "application/problem+json") shouldBe true
                 deletePhotoReaction.hasResponseMediaType("403", "application/problem+json") shouldBe true
                 deletePhotoReaction.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 createPhotoReaction["summary"].stringValue() shouldBe "사진 리액션 등록"
@@ -867,6 +870,18 @@ private val errorResponseExpectations = listOf(
     ),
     ErrorResponseExpectation(
         "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
+        "get",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
+        "post",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
         "post",
         "403",
         setOf(ErrorCode.NOT_GROUP_MEMBER),
@@ -876,6 +891,12 @@ private val errorResponseExpectations = listOf(
         "post",
         "404",
         setOf(ErrorCode.PHOTO_NOT_FOUND, ErrorCode.USER_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}/reactions/{reactionId}",
+        "delete",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
     ),
     ErrorResponseExpectation(
         "/api/v1/groups/{groupId}/photos/{photoId}/reactions/{reactionId}",

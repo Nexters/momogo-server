@@ -138,6 +138,24 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
                 body["instance"].stringValue() shouldBe "/test/enum"
             }
         }
+
+        `when`("경로 변수에 숫자가 아니거나 Long 범위를 넘는 값을 전달할 때") {
+            then("공통 INVALID_REQUEST ProblemDetail로 응답한다") {
+                listOf("not-a-number", "9223372036854775808").forEach { invalidNumber ->
+                    val response = mockMvc.perform(get("/test/numbers/$invalidNumber"))
+                        .andReturn()
+                        .response
+                    val body = objectMapper.readTree(response.contentAsString)
+
+                    response.status shouldBe 400
+                    response.contentType shouldBe MediaType.APPLICATION_PROBLEM_JSON_VALUE
+                    body["status"].intValue() shouldBe 400
+                    body["detail"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.message
+                    body["instance"].stringValue() shouldBe "/test/numbers/$invalidNumber"
+                    body["code"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.name
+                }
+            }
+        }
     }
 
     given("DB 무결성 위반이 발생하면") {
@@ -195,6 +213,12 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
             @RequestBody
             request: EnumRequest
         ) = request
+
+        @GetMapping("/numbers/{number}")
+        fun number(
+            @PathVariable
+            number: Long,
+        ) = number
 
         @GetMapping("/other-data-integrity")
         fun otherDataIntegrity(): Nothing =
