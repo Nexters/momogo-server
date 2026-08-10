@@ -2,12 +2,14 @@ package com.mogumogu.momogo.global.error
 
 import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
+import org.springframework.beans.TypeMismatchException
 import org.springframework.http.*
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.WebRequest
+import org.springframework.web.method.annotation.HandlerMethodValidationException
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
 
 @RestControllerAdvice
@@ -41,6 +43,40 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
 
     override fun handleHttpMessageNotReadable(
         ex: HttpMessageNotReadableException,
+        headers: HttpHeaders,
+        status: HttpStatusCode,
+        request: WebRequest,
+    ): ResponseEntity<Any>? =
+        handleExceptionInternal(
+            ex,
+            createProblemDetail(
+                status = HttpStatus.BAD_REQUEST,
+                errorCode = ErrorCode.INVALID_REQUEST,
+            ),
+            headers,
+            HttpStatus.BAD_REQUEST,
+            request,
+        )
+
+    override fun handleTypeMismatch(
+        ex: TypeMismatchException,
+        headers: HttpHeaders,
+        status: HttpStatusCode,
+        request: WebRequest,
+    ): ResponseEntity<Any>? =
+        handleExceptionInternal(
+            ex,
+            createProblemDetail(
+                status = HttpStatus.BAD_REQUEST,
+                errorCode = ErrorCode.INVALID_REQUEST,
+            ),
+            headers,
+            HttpStatus.BAD_REQUEST,
+            request,
+        )
+
+    override fun handleHandlerMethodValidationException(
+        ex: HandlerMethodValidationException,
         headers: HttpHeaders,
         status: HttpStatusCode,
         request: WebRequest,

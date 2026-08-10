@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Positive
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
@@ -138,6 +139,40 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
                 body["instance"].stringValue() shouldBe "/test/enum"
             }
         }
+
+        `when`("경로 변수에 숫자가 아니거나 Long 범위를 넘는 값을 전달할 때") {
+            then("공통 INVALID_REQUEST ProblemDetail로 응답한다") {
+                listOf("not-a-number", "9223372036854775808").forEach { invalidNumber ->
+                    val response = mockMvc.perform(get("/test/numbers/$invalidNumber"))
+                        .andReturn()
+                        .response
+                    val body = objectMapper.readTree(response.contentAsString)
+
+                    response.status shouldBe 400
+                    response.contentType shouldBe MediaType.APPLICATION_PROBLEM_JSON_VALUE
+                    body["status"].intValue() shouldBe 400
+                    body["detail"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.message
+                    body["instance"].stringValue() shouldBe "/test/numbers/$invalidNumber"
+                    body["code"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.name
+                }
+            }
+        }
+
+        `when`("경로 변수 검증이 실패할 때") {
+            val response = mockMvc.perform(get("/test/numbers/0"))
+                .andReturn()
+                .response
+            val body = objectMapper.readTree(response.contentAsString)
+
+            then("공통 INVALID_REQUEST ProblemDetail로 응답한다") {
+                response.status shouldBe 400
+                response.contentType shouldBe MediaType.APPLICATION_PROBLEM_JSON_VALUE
+                body["status"].intValue() shouldBe 400
+                body["detail"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.message
+                body["instance"].stringValue() shouldBe "/test/numbers/0"
+                body["code"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.name
+            }
+        }
     }
 
     given("DB 무결성 위반이 발생하면") {
@@ -195,6 +230,13 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
             @RequestBody
             request: EnumRequest
         ) = request
+
+        @GetMapping("/numbers/{number}")
+        fun number(
+            @PathVariable
+            @Positive
+            number: Long,
+        ) = number
 
         @GetMapping("/other-data-integrity")
         fun otherDataIntegrity(): Nothing =

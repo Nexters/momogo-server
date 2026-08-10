@@ -73,10 +73,14 @@ class OpenApiDocumentationTest(
                 document.operation("/api/v1/photos/me", "get")
                     .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/photos", "post").requiresBearerAuth() shouldBe true
-                document.operation("/api/v1/photos/{photoId}/reactions", "post")
+                document.operation("/api/v1/groups/{groupId}/photos/{photoId}/reactions", "post")
                     .requiresBearerAuth() shouldBe true
-                document.operation("/api/v1/photos/{photoId}/reactions/{reactionId}", "delete")
+                document.operation("/api/v1/groups/{groupId}/photos/{photoId}/reactions", "get")
                     .requiresBearerAuth() shouldBe true
+                document.operation(
+                    "/api/v1/groups/{groupId}/photos/{photoId}/reactions/{reactionId}",
+                    "delete",
+                ).requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/user/register", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/login", "post").requiresBearerAuth() shouldBe false
                 document.operation("/api/v1/auth/reissue", "post").requiresBearerAuth() shouldBe false
@@ -122,11 +126,15 @@ class OpenApiDocumentationTest(
                     "post",
                 )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
                 document.operation(
-                    "/api/v1/photos/{photoId}/reactions",
+                    "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
                     "post",
                 )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
                 document.operation(
-                    "/api/v1/photos/{photoId}/reactions/{reactionId}",
+                    "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
+                    "get",
+                )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
+                document.operation(
+                    "/api/v1/groups/{groupId}/photos/{photoId}/reactions/{reactionId}",
                     "delete",
                 )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
 
@@ -196,7 +204,7 @@ class OpenApiDocumentationTest(
                 val getMyPhotos = document.operation("/api/v1/photos/me", "get")
                 val createPhoto = document.operation("/api/v1/photos", "post")
                 val createPhotoReaction = document.operation(
-                    "/api/v1/photos/{photoId}/reactions",
+                    "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
                     "post",
                 )
                 val checkAppVersion = document.operation("/init/versions", "get")
@@ -264,13 +272,27 @@ class OpenApiDocumentationTest(
                 createPhoto.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 createPhoto.hasResponseMediaType("409", "application/problem+json") shouldBe true
                 createPhoto.hasResponseMediaType("422", "application/problem+json") shouldBe true
+                val getPhotoReactions = document.operation(
+                    "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
+                    "get",
+                )
+                getPhotoReactions["summary"].stringValue() shouldBe "사진 리액션 조회"
+                getPhotoReactions.responseCodes() shouldBe setOf("200", "400", "401", "403", "404")
+                getPhotoReactions.hasResponseMediaType("200", "application/json") shouldBe true
+                getPhotoReactions.hasResponseMediaType("400", "application/problem+json") shouldBe true
+                getPhotoReactions.hasResponseMediaType("403", "application/problem+json") shouldBe true
+                getPhotoReactions.hasResponseMediaType("404", "application/problem+json") shouldBe true
+                getPhotoReactions.parameter("groupId")["example"].intValue() shouldBe 10
+
                 val deletePhotoReaction = document.operation(
-                    "/api/v1/photos/{photoId}/reactions/{reactionId}",
+                    "/api/v1/groups/{groupId}/photos/{photoId}/reactions/{reactionId}",
                     "delete",
                 )
                 deletePhotoReaction["summary"].stringValue() shouldBe "사진 리액션 삭제"
-                deletePhotoReaction.responseCodes() shouldBe setOf("200", "401", "403", "404")
+                deletePhotoReaction.responseCodes() shouldBe
+                    setOf("200", "400", "401", "403", "404")
                 deletePhotoReaction.hasResponseMediaType("200", "application/json") shouldBe true
+                deletePhotoReaction.hasResponseMediaType("400", "application/problem+json") shouldBe true
                 deletePhotoReaction.hasResponseMediaType("403", "application/problem+json") shouldBe true
                 deletePhotoReaction.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 createPhotoReaction["summary"].stringValue() shouldBe "사진 리액션 등록"
@@ -640,12 +662,18 @@ private val operationExampleExpectations = listOf(
         successSchema = "ReactionCommentsResponse",
     ),
     OperationExampleExpectation(
-        path = "/api/v1/photos/{photoId}/reactions",
+        path = "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
         method = "post",
         request = OpenApiExample.PHOTO_REACTION_CREATE_REQUEST,
         requestSchema = "PhotoReactionCreateRequest",
         success = OpenApiExample.PHOTO_REACTION_CREATE_RESPONSE,
         successSchema = "PhotoReactionCreateResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
+        method = "get",
+        success = OpenApiExample.PHOTO_REACTIONS_RESPONSE,
+        successSchema = "PhotoReactionsResponse",
     ),
 )
 
@@ -841,25 +869,43 @@ private val errorResponseExpectations = listOf(
         setOf(ErrorCode.INVALID_PLATFORM, ErrorCode.INVALID_REQUEST),
     ),
     ErrorResponseExpectation(
-        "/api/v1/photos/{photoId}/reactions",
+        "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
+        "get",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
+        "post",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
         "post",
         "403",
         setOf(ErrorCode.NOT_GROUP_MEMBER),
     ),
     ErrorResponseExpectation(
-        "/api/v1/photos/{photoId}/reactions",
+        "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
         "post",
         "404",
         setOf(ErrorCode.PHOTO_NOT_FOUND, ErrorCode.USER_NOT_FOUND),
     ),
     ErrorResponseExpectation(
-        "/api/v1/photos/{photoId}/reactions/{reactionId}",
+        "/api/v1/groups/{groupId}/photos/{photoId}/reactions/{reactionId}",
+        "delete",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}/reactions/{reactionId}",
         "delete",
         "403",
         setOf(ErrorCode.FORBIDDEN),
     ),
     ErrorResponseExpectation(
-        "/api/v1/photos/{photoId}/reactions/{reactionId}",
+        "/api/v1/groups/{groupId}/photos/{photoId}/reactions/{reactionId}",
         "delete",
         "404",
         setOf(ErrorCode.REACTION_NOT_FOUND),

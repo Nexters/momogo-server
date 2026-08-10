@@ -8,6 +8,7 @@ import com.mogumogu.momogo.global.openapi.OpenApiExample
 import com.mogumogu.momogo.global.security.RequestUserId
 import com.mogumogu.momogo.reaction.application.CreatePhotoReactionCommand
 import com.mogumogu.momogo.reaction.application.DeletePhotoReactionCommand
+import com.mogumogu.momogo.reaction.application.GetPhotoReactionsCommand
 import com.mogumogu.momogo.reaction.application.PhotoReactionService
 import com.mogumogu.momogo.reaction.domain.Emoji
 import com.mogumogu.momogo.reaction.domain.ReactionComment
@@ -22,6 +23,7 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.Size
 import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -35,10 +37,59 @@ import java.time.LocalDateTime
 )
 @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
 @RestController
-@RequestMapping("/api/v1/photos")
+@RequestMapping("/api/v1/groups/{groupId}/photos")
 class PhotoReactionController(
     private val photoReactionService: PhotoReactionService,
 ) {
+
+    @Operation(
+        summary = "사진 리액션 조회",
+        description = "그룹에 올라온 사진에 달린 리액션을 등록순으로 조회합니다. " +
+            "리액션이 없으면 빈 목록을 반환합니다.",
+    )
+    @ApiExamples(success = OpenApiExample.PHOTO_REACTIONS_RESPONSE)
+    @ApiErrors(
+        badRequest = [ErrorCode.INVALID_REQUEST],
+        forbidden = [ErrorCode.NOT_GROUP_MEMBER],
+        notFound = [ErrorCode.PHOTO_NOT_FOUND],
+    )
+    @GetMapping("/{photoId}/reactions")
+    fun getReactions(
+        @RequestUserId
+        userId: Long,
+        @Parameter(example = "10")
+        @Positive(message = "groupId는 0보다 커야 합니다.")
+        @PathVariable
+        groupId: Long,
+        @Parameter(example = "501")
+        @PathVariable
+        photoId: Long,
+    ): PhotoReactionsResponse {
+        val result = photoReactionService.getReactions(
+            GetPhotoReactionsCommand(
+                userId = userId,
+                photoId = photoId,
+                groupId = groupId,
+            ),
+        )
+
+        return PhotoReactionsResponse(
+            photoId = result.photoId,
+            groupId = result.groupId,
+            reactions = result.reactions.map { reaction ->
+                PhotoReactionResponse(
+                    reactionId = reaction.reactionId,
+                    userId = reaction.userId,
+                    nickname = reaction.nickname,
+                    concept = reaction.concept,
+                    emoji = reaction.emoji,
+                    comment = reaction.comment,
+                    createdAt = reaction.createdAt,
+                    mine = reaction.mine,
+                )
+            },
+        )
+    }
 
     @Operation(
         summary = "사진 리액션 등록",
@@ -62,6 +113,10 @@ class PhotoReactionController(
     fun create(
         @RequestUserId
         userId: Long,
+        @Parameter(example = "10")
+        @Positive(message = "groupId는 0보다 커야 합니다.")
+        @PathVariable
+        groupId: Long,
         @Parameter(example = "501")
         @PathVariable
         photoId: Long,
@@ -73,7 +128,7 @@ class PhotoReactionController(
             CreatePhotoReactionCommand(
                 userId = userId,
                 photoId = photoId,
-                groupId = request.groupId,
+                groupId = groupId,
                 concept = request.concept,
                 emoji = request.emoji,
                 comment = request.comment,
@@ -97,6 +152,7 @@ class PhotoReactionController(
     )
     @ApiExamples(success = OpenApiExample.EMPTY_OBJECT_RESPONSE)
     @ApiErrors(
+        badRequest = [ErrorCode.INVALID_REQUEST],
         forbidden = [ErrorCode.FORBIDDEN],
         notFound = [ErrorCode.REACTION_NOT_FOUND],
     )
@@ -104,6 +160,10 @@ class PhotoReactionController(
     fun delete(
         @RequestUserId
         userId: Long,
+        @Parameter(example = "10")
+        @Positive(message = "groupId는 0보다 커야 합니다.")
+        @PathVariable
+        groupId: Long,
         @Parameter(example = "501")
         @PathVariable
         photoId: Long,
@@ -115,6 +175,7 @@ class PhotoReactionController(
             DeletePhotoReactionCommand(
                 userId = userId,
                 photoId = photoId,
+                groupId = groupId,
                 reactionId = reactionId,
             ),
         )
@@ -122,16 +183,92 @@ class PhotoReactionController(
     }
 }
 
-@Schema(description = "사진 리액션 등록 요청")
-data class PhotoReactionCreateRequest(
-    @field:Positive(message = "groupId는 0보다 커야 합니다.")
+@Schema(description = "사진 리액션 조회 응답")
+data class PhotoReactionsResponse(
     @field:Schema(
-        description = "사진이 올라온 그룹 ID. 같은 사진이라도 그룹마다 리액션이 따로 쌓인다.",
+        description = "리액션을 조회한 사진 ID",
+        example = "501",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val photoId: Long,
+
+    @field:Schema(
+        description = "리액션을 조회한 그룹 ID",
         example = "10",
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val groupId: Long,
 
+    @field:Schema(
+        description = "등록순으로 정렬된 리액션 목록. 리액션이 없으면 빈 목록",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val reactions: List<PhotoReactionResponse>,
+)
+
+@Schema(description = "사진에 달린 리액션")
+data class PhotoReactionResponse(
+    @field:Schema(
+        description = "리액션 ID",
+        example = "901",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val reactionId: Long,
+
+    @field:Schema(
+        description = "리액션을 남긴 사용자 ID",
+        example = "1",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val userId: Long,
+
+    @field:Schema(
+        description = "리액션을 남긴 사용자 닉네임",
+        example = "모모",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val nickname: String,
+
+    @field:Schema(
+        description = "리액션 컨셉",
+        example = "YOUNG_CREATOR_CREW",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val concept: ReactionConcept,
+
+    @field:Schema(
+        description = "리액션 이모지",
+        example = "DELICIOUS",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val emoji: Emoji,
+
+    @field:Schema(
+        description = "리액션 문구",
+        example = "야르~",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val comment: String,
+
+    @field:Schema(
+        description = "리액션이 등록된 시각(Asia/Seoul)",
+        example = "2026-08-08T14:30:00.123456",
+        type = "string",
+        format = "date-time",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val createdAt: LocalDateTime,
+
+    @field:Schema(
+        description = "현재 사용자가 남긴 리액션인지 여부. true면 삭제할 수 있다.",
+        example = "true",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val mine: Boolean,
+)
+
+@Schema(description = "사진 리액션 등록 요청")
+data class PhotoReactionCreateRequest(
     @field:Schema(
         description = "리액션 컨셉",
         example = "YOUNG_CREATOR_CREW",
