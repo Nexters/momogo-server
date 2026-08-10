@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 @Tag(
     name = "그룹",
@@ -44,7 +45,8 @@ class GroupController(
 
     @Operation(
         summary = "내가 참여한 그룹 조회",
-        description = "현재 사용자가 참여 중인 그룹과 오늘 사진을 올린 그룹 멤버 수를 조회합니다.",
+        description = "현재 사용자가 참여 중인 그룹, 오늘 사진을 올린 그룹 멤버 수와 " +
+            "다른 사용자가 올린 활성 사진의 최신 등록 시각을 조회합니다.",
     )
     @ApiExamples(success = OpenApiExample.JOINED_GROUPS_RESPONSE)
     @ApiErrors(notFound = [ErrorCode.USER_NOT_FOUND])
@@ -63,6 +65,7 @@ class GroupController(
                     groupName = group.groupName,
                     totalMemberCount = group.totalMemberCount,
                     todayPhotoUploaderCount = group.todayPhotoUploaderCount,
+                    latestUploadAt = group.latestUploadAt,
                 )
             },
         )
@@ -287,6 +290,17 @@ data class JoinedGroupResponse(
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val todayPhotoUploaderCount: Long,
+
+    @field:Schema(
+        description = "다른 사용자가 그룹에 올린 활성 사진의 최신 등록 시각(Asia/Seoul). " +
+            "해당 사진이 없으면 null",
+        example = "2026-08-10T14:30:00.123456",
+        type = "string",
+        format = "date-time",
+        nullable = true,
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val latestUploadAt: LocalDateTime?,
 )
 
 @Schema(description = "그룹 생성 요청")

@@ -37,6 +37,7 @@ import tools.jackson.databind.ObjectMapper
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -296,6 +297,10 @@ class GroupApiIntegrationTest(
 
                 val date = LocalDate.now(clock)
                 val todayAtNoon = date.atTime(12, 0).atZone(clock.zone).toInstant()
+                val formerMemberUploadAt = date.atTime(13, 0).atZone(clock.zone).toInstant()
+                val anonymousUploadAt = date.atTime(14, 0).atZone(clock.zone).toInstant()
+                val unlinkedUploadAt = date.atTime(15, 0).atZone(clock.zone).toInstant()
+                val requestingUserUploadAt = date.atTime(16, 0).atZone(clock.zone).toInstant()
                 val previousDayAtNoon = date.minusDays(1).atTime(12, 0).atZone(clock.zone).toInstant()
                 listOf(
                     savePhoto(firstUploader, groupWithPhotos, "photos/list-first.jpg"),
@@ -312,11 +317,11 @@ class GroupApiIntegrationTest(
                         objectKey = "photos/list-unlinked.jpg",
                         unlinkedAt = clock.instant(),
                     ),
-                    todayAtNoon,
+                    unlinkedUploadAt,
                 )
                 movePhotoGroupCreatedAt(
                     savePhoto(leftUploader, groupWithPhotos, "photos/list-left.jpg"),
-                    todayAtNoon,
+                    formerMemberUploadAt,
                 )
                 movePhotoGroupCreatedAt(
                     savePhoto(
@@ -324,9 +329,17 @@ class GroupApiIntegrationTest(
                         groupWithPhotos,
                         "photos/list-withdrawn.jpg",
                     ),
-                    todayAtNoon,
+                    anonymousUploadAt,
                 )
                 withdraw(withdrawnUploader.accessToken).status shouldBe HttpStatus.OK.value()
+                movePhotoGroupCreatedAt(
+                    savePhoto(
+                        requestingUser.user,
+                        groupWithPhotos,
+                        "photos/list-requester.jpg",
+                    ),
+                    requestingUserUploadAt,
+                )
 
                 val groupWithoutPhotos = saveGroup(
                     name = "오늘 사진이 없는 그룹",
@@ -367,15 +380,19 @@ class GroupApiIntegrationTest(
                         "groupName",
                         "totalMemberCount",
                         "todayPhotoUploaderCount",
+                        "latestUploadAt",
                     )
                     group["groupName"].stringValue() shouldBe "오늘 사진이 있는 그룹"
                     group["totalMemberCount"].longValue() shouldBe 5L
-                    group["todayPhotoUploaderCount"].longValue() shouldBe 2L
+                    group["todayPhotoUploaderCount"].longValue() shouldBe 3L
+                    LocalDateTime.parse(group["latestUploadAt"].stringValue()) shouldBe
+                        LocalDateTime.ofInstant(anonymousUploadAt, clock.zone)
                 }
                 groupsById.getValue(requireNotNull(groupWithoutPhotos.id)).let { group ->
                     group["groupName"].stringValue() shouldBe "오늘 사진이 없는 그룹"
                     group["totalMemberCount"].longValue() shouldBe 1L
                     group["todayPhotoUploaderCount"].longValue() shouldBe 0L
+                    group["latestUploadAt"].isNull shouldBe true
                 }
             }
         }
