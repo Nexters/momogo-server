@@ -7,9 +7,15 @@ import com.mogumogu.momogo.group.domain.InviteCode
 import com.mogumogu.momogo.group.infra.GroupMemberRepository
 import com.mogumogu.momogo.group.infra.GroupRepository
 import com.mogumogu.momogo.photo.domain.Photo
+import com.mogumogu.momogo.photo.domain.PhotoContentType
 import com.mogumogu.momogo.photo.domain.PhotoGroup
+import com.mogumogu.momogo.photo.domain.PhotoObjectKey
 import com.mogumogu.momogo.photo.infra.PhotoGroupRepository
 import com.mogumogu.momogo.photo.infra.PhotoRepository
+import com.mogumogu.momogo.reaction.domain.Emoji
+import com.mogumogu.momogo.reaction.domain.PhotoReaction
+import com.mogumogu.momogo.reaction.domain.ReactionConcept
+import com.mogumogu.momogo.reaction.infra.PhotoReactionRepository
 import com.mogumogu.momogo.user.domain.User
 import com.mogumogu.momogo.user.infra.LoginAccountRepository
 import com.mogumogu.momogo.user.infra.RefreshTokenRepository
@@ -34,6 +40,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import tools.jackson.databind.ObjectMapper
+import java.net.URI
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -41,6 +48,7 @@ import java.time.LocalDateTime
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.UUID
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -54,6 +62,7 @@ class GroupApiIntegrationTest(
     private val refreshTokenRepository: RefreshTokenRepository,
     private val photoRepository: PhotoRepository,
     private val photoGroupRepository: PhotoGroupRepository,
+    private val photoReactionRepository: PhotoReactionRepository,
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
     private val jdbcTemplate: JdbcTemplate,
@@ -62,6 +71,7 @@ class GroupApiIntegrationTest(
     testExecutionMode = TestExecutionMode.Sequential
 
     fun cleanDatabase() {
+        photoReactionRepository.deleteAllInBatch()
         photoGroupRepository.deleteAllInBatch()
         photoRepository.deleteAllInBatch()
         groupMemberRepository.deleteAllInBatch()
@@ -116,6 +126,21 @@ class GroupApiIntegrationTest(
         val request = get("/api/v1/groups")
         if (accessToken != null) {
             request.header("Authorization", "Bearer $accessToken")
+        }
+        return mockMvc.perform(request).andReturn().response
+    }
+
+    fun getGroup(
+        accessToken: String?,
+        groupId: Long,
+        dateValue: String?,
+    ): MockHttpServletResponse {
+        val request = get("/api/v1/groups/{groupId}", groupId)
+        if (accessToken != null) {
+            request.header("Authorization", "Bearer $accessToken")
+        }
+        if (dateValue != null) {
+            request.queryParam("date", dateValue)
         }
         return mockMvc.perform(request).andReturn().response
     }
@@ -241,6 +266,18 @@ class GroupApiIntegrationTest(
         return photo
     }
 
+    fun validObjectKey(
+        uploader: User,
+        date: LocalDate,
+    ): String =
+        PhotoObjectKey.generate(
+            phase = "test",
+            userId = requireNotNull(uploader.id),
+            uploadDate = date,
+            objectId = UUID.randomUUID(),
+            contentType = requireNotNull(PhotoContentType.from("image/jpeg")),
+        ).value
+
     fun movePhotoGroupCreatedAt(
         photo: Photo,
         createdAt: Instant,
@@ -250,6 +287,36 @@ class GroupApiIntegrationTest(
             createdAt,
             requireNotNull(photo.id),
         )
+    }
+
+    fun saveReaction(
+        photo: Photo,
+        group: Group,
+        reactor: User,
+        comment: String,
+        createdAt: Instant,
+    ): PhotoReaction {
+        val photoGroup = requireNotNull(
+            photoGroupRepository.findActiveByPhotoIdAndGroupId(
+                photoId = requireNotNull(photo.id),
+                groupId = requireNotNull(group.id),
+            ),
+        )
+        val reaction = photoReactionRepository.saveAndFlush(
+            PhotoReaction(
+                _photoGroup = photoGroup,
+                _user = reactor,
+                _concept = ReactionConcept.YOUNG_CREATOR_CREW,
+                _emoji = Emoji.DELICIOUS,
+                _comment = comment,
+            ),
+        )
+        jdbcTemplate.update(
+            "UPDATE photo_reaction SET created_at = ? WHERE id = ?",
+            createdAt,
+            requireNotNull(reaction.id),
+        )
+        return reaction
     }
 
     fun assertProblem(
@@ -378,11 +445,14 @@ class GroupApiIntegrationTest(
                     group.propertyNames().toSet() shouldBe setOf(
                         "groupId",
                         "groupName",
+                        "createdAt",
                         "totalMemberCount",
                         "todayPhotoUploaderCount",
                         "latestUploadAt",
                     )
                     group["groupName"].stringValue() shouldBe "오늘 사진이 있는 그룹"
+                    LocalDateTime.parse(group["createdAt"].stringValue()) shouldBe
+                        LocalDateTime.ofInstant(groupWithPhotos.createdAt, clock.zone)
                     group["totalMemberCount"].longValue() shouldBe 5L
                     group["todayPhotoUploaderCount"].longValue() shouldBe 3L
                     LocalDateTime.parse(group["latestUploadAt"].stringValue()) shouldBe
@@ -411,6 +481,237 @@ class GroupApiIntegrationTest(
                 body["date"].stringValue() shouldBe LocalDate.now(clock).toString()
                 body["groups"].isArray shouldBe true
                 body["groups"].isEmpty shouldBe true
+            }
+        }
+    }
+
+    given("현재 그룹원들이 선택 날짜에 사진과 리액션을 등록했으면") {
+        `when`("날짜별 그룹 사진을 조회할 때") {
+            then("현재 사용자를 먼저 두고 사진과 최신 리액션 한 건을 반환한다") {
+                cleanDatabase()
+                val viewer = registerUser("group-detail-viewer")
+                val firstMember = userRepository.saveAndFlush(User(_nickname = "가나다"))
+                val photoMember = userRepository.saveAndFlush(User(_nickname = "나나"))
+                val unlinkedPhotoMember = userRepository.saveAndFlush(User(_nickname = "다나"))
+                val leftMember = userRepository.saveAndFlush(User(_nickname = "라라"))
+                val group = saveGroup(name = "상세 조회 그룹", code = "DETAIL")
+                listOf(viewer.user, firstMember, photoMember, unlinkedPhotoMember)
+                    .forEach { user -> saveMember(group, user) }
+                saveMember(group, leftMember, deletedAt = clock.instant())
+
+                val date = LocalDate.now(clock)
+                val viewerPhotoAt = date.atTime(10, 0).atZone(clock.zone).toInstant()
+                val memberPhotoAt = date.atTime(11, 0).atZone(clock.zone).toInstant()
+                val viewerPhoto = savePhoto(
+                    viewer.user,
+                    group,
+                    validObjectKey(viewer.user, date),
+                ).also { photo -> movePhotoGroupCreatedAt(photo, viewerPhotoAt) }
+                val memberPhoto = savePhoto(
+                    photoMember,
+                    group,
+                    validObjectKey(photoMember, date),
+                ).also { photo -> movePhotoGroupCreatedAt(photo, memberPhotoAt) }
+                savePhoto(
+                    firstMember,
+                    group,
+                    validObjectKey(firstMember, date.minusDays(1)),
+                ).also { photo ->
+                    movePhotoGroupCreatedAt(
+                        photo,
+                        date.minusDays(1).atTime(12, 0).atZone(clock.zone).toInstant(),
+                    )
+                }
+                savePhoto(
+                    unlinkedPhotoMember,
+                    group,
+                    validObjectKey(unlinkedPhotoMember, date),
+                    unlinkedAt = clock.instant(),
+                ).also { photo ->
+                    movePhotoGroupCreatedAt(
+                        photo,
+                        date.atTime(12, 0).atZone(clock.zone).toInstant(),
+                    )
+                }
+                savePhoto(
+                    leftMember,
+                    group,
+                    validObjectKey(leftMember, date),
+                ).also { photo ->
+                    movePhotoGroupCreatedAt(
+                        photo,
+                        date.atTime(13, 0).atZone(clock.zone).toInstant(),
+                    )
+                }
+                val reactionAt = date.atTime(14, 0).atZone(clock.zone).toInstant()
+                saveReaction(memberPhoto, group, photoMember, "이전 반응", reactionAt)
+                val latestReaction = saveReaction(
+                    memberPhoto,
+                    group,
+                    viewer.user,
+                    "최신 반응",
+                    reactionAt,
+                )
+
+                val response = getGroup(
+                    accessToken = viewer.accessToken,
+                    groupId = requireNotNull(group.id),
+                    dateValue = date.toString(),
+                )
+
+                response.status shouldBe HttpStatus.OK.value()
+                response.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
+                val body = objectMapper.readTree(response.contentAsString)
+                body.propertyNames().toSet() shouldBe
+                    setOf("groupId", "groupName", "createdAt", "date", "members")
+                body["groupId"].longValue() shouldBe requireNotNull(group.id)
+                body["groupName"].stringValue() shouldBe "상세 조회 그룹"
+                LocalDateTime.parse(body["createdAt"].stringValue()) shouldBe
+                    LocalDateTime.ofInstant(group.createdAt, clock.zone)
+                body["date"].stringValue() shouldBe date.toString()
+
+                val members = body["members"]
+                val memberNodes = (0 until members.size()).map { index -> members[index] }
+                memberNodes.map { member -> member["userId"].longValue() } shouldBe listOf(
+                    requireNotNull(viewer.user.id),
+                    requireNotNull(firstMember.id),
+                    requireNotNull(photoMember.id),
+                    requireNotNull(unlinkedPhotoMember.id),
+                )
+                memberNodes.forEach { member ->
+                    member.propertyNames().toSet() shouldBe
+                        setOf("userId", "nickname", "mine", "photo")
+                }
+                members[0]["mine"].booleanValue() shouldBe true
+                val viewerPhotoNode = members[0]["photo"]
+                viewerPhotoNode["photoId"].longValue() shouldBe requireNotNull(viewerPhoto.id)
+                viewerPhotoNode["latestReaction"].isNull shouldBe true
+                members[1]["photo"].isNull shouldBe true
+                members[3]["photo"].isNull shouldBe true
+
+                val memberPhotoNode = members[2]["photo"]
+                memberPhotoNode.propertyNames().toSet() shouldBe setOf(
+                    "photoId",
+                    "downloadUrl",
+                    "contentType",
+                    "createdAt",
+                    "expiresAt",
+                    "latestReaction",
+                )
+                memberPhotoNode["photoId"].longValue() shouldBe requireNotNull(memberPhoto.id)
+                memberPhotoNode["contentType"].stringValue() shouldBe "image/jpeg"
+                URI(memberPhotoNode["downloadUrl"].stringValue()).path
+                    .startsWith("/momogo-test/") shouldBe true
+                LocalDateTime.parse(memberPhotoNode["createdAt"].stringValue()) shouldBe
+                    LocalDateTime.ofInstant(memberPhotoAt, clock.zone)
+                LocalDateTime.parse(memberPhotoNode["expiresAt"].stringValue())
+                    .isAfter(LocalDateTime.now(clock)) shouldBe true
+                val latestReactionNode = memberPhotoNode["latestReaction"]
+                latestReactionNode.propertyNames().toSet() shouldBe setOf(
+                    "reactionId",
+                    "userId",
+                    "nickname",
+                    "concept",
+                    "emoji",
+                    "comment",
+                    "createdAt",
+                    "mine",
+                )
+                latestReactionNode["reactionId"].longValue() shouldBe requireNotNull(latestReaction.id)
+                latestReactionNode["userId"].longValue() shouldBe requireNotNull(viewer.user.id)
+                latestReactionNode["nickname"].stringValue() shouldBe "모모"
+                latestReactionNode["concept"].stringValue() shouldBe "YOUNG_CREATOR_CREW"
+                latestReactionNode["emoji"].stringValue() shouldBe "DELICIOUS"
+                latestReactionNode["comment"].stringValue() shouldBe "최신 반응"
+                LocalDateTime.parse(latestReactionNode["createdAt"].stringValue()) shouldBe
+                    LocalDateTime.ofInstant(reactionAt, clock.zone)
+                latestReactionNode["mine"].booleanValue() shouldBe true
+            }
+        }
+    }
+
+    given("그룹 상세 조회 날짜를 생략하거나 활동 범위 밖 날짜를 지정하면") {
+        `when`("날짜별 그룹 사진을 조회할 때") {
+            then("생략 시 오늘을 조회하고 유효한 다른 날짜에는 빈 사진을 반환한다") {
+                cleanDatabase()
+                val viewer = registerUser("group-detail-default-date")
+                val group = saveGroup(name = "기본 날짜 그룹", code = "DATE00")
+                saveMember(group, viewer.user)
+                val today = LocalDate.now(clock)
+                val photo = savePhoto(viewer.user, group, validObjectKey(viewer.user, today))
+                movePhotoGroupCreatedAt(
+                    photo,
+                    today.atTime(12, 0).atZone(clock.zone).toInstant(),
+                )
+
+                val todayResponse = getGroup(
+                    accessToken = viewer.accessToken,
+                    groupId = requireNotNull(group.id),
+                    dateValue = null,
+                )
+                todayResponse.status shouldBe HttpStatus.OK.value()
+                val todayBody = objectMapper.readTree(todayResponse.contentAsString)
+                todayBody["date"].stringValue() shouldBe today.toString()
+                todayBody["members"][0]["photo"]["photoId"].longValue() shouldBe
+                    requireNotNull(photo.id)
+
+                val futureResponse = getGroup(
+                    accessToken = viewer.accessToken,
+                    groupId = requireNotNull(group.id),
+                    dateValue = today.plusDays(30).toString(),
+                )
+                futureResponse.status shouldBe HttpStatus.OK.value()
+                val futureBody = objectMapper.readTree(futureResponse.contentAsString)
+                futureBody["date"].stringValue() shouldBe today.plusDays(30).toString()
+                futureBody["members"][0]["photo"].isNull shouldBe true
+            }
+        }
+    }
+
+    given("그룹 상세 요청의 날짜, 그룹 또는 멤버십이 올바르지 않으면") {
+        `when`("날짜별 그룹 사진을 조회할 때") {
+            then("상황에 맞는 오류를 반환한다") {
+                cleanDatabase()
+                val member = registerUser("group-detail-member")
+                val outsider = registerUser("group-detail-outsider")
+                val leftMember = registerUser("group-detail-left-member")
+                val group = saveGroup(name = "접근 검사 그룹", code = "ACCESS")
+                saveMember(group, member.user)
+                saveMember(group, leftMember.user, deletedAt = clock.instant())
+                val groupId = requireNotNull(group.id)
+
+                assertProblem(
+                    getGroup(member.accessToken, groupId, "2026-13-40"),
+                    HttpStatus.BAD_REQUEST,
+                    ErrorCode.INVALID_REQUEST,
+                )
+                assertProblem(
+                    getGroup(member.accessToken, 0L, LocalDate.now(clock).toString()),
+                    HttpStatus.BAD_REQUEST,
+                    ErrorCode.INVALID_REQUEST,
+                )
+                listOf(outsider, leftMember).forEach { user ->
+                    assertProblem(
+                        getGroup(user.accessToken, groupId, null),
+                        HttpStatus.FORBIDDEN,
+                        ErrorCode.NOT_GROUP_MEMBER,
+                    )
+                }
+                assertProblem(
+                    getGroup(member.accessToken, Long.MAX_VALUE, null),
+                    HttpStatus.NOT_FOUND,
+                    ErrorCode.GROUP_NOT_FOUND,
+                )
+
+                val deletedGroup = saveGroup(name = "삭제된 상세 그룹", code = "DELDET")
+                saveMember(deletedGroup, member.user)
+                deletedGroup.delete(clock.instant())
+                groupRepository.saveAndFlush(deletedGroup)
+                assertProblem(
+                    getGroup(member.accessToken, requireNotNull(deletedGroup.id), null),
+                    HttpStatus.NOT_FOUND,
+                    ErrorCode.GROUP_NOT_FOUND,
+                )
             }
         }
     }
@@ -1184,6 +1485,7 @@ class GroupApiIntegrationTest(
 
                 listOf(
                     getJoinedGroups(accessToken = null),
+                    getGroup(accessToken = null, groupId = 1L, dateValue = null),
                     invitationInfo(accessToken = null, code = "AUTH01"),
                     joinGroup(accessToken = null, code = "AUTH01"),
                     leaveGroup(accessToken = null, groupId = 1L),

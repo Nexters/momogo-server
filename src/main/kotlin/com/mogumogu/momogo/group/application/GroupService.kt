@@ -8,7 +8,12 @@ import com.mogumogu.momogo.group.domain.GroupMember
 import com.mogumogu.momogo.group.domain.InviteCode
 import com.mogumogu.momogo.group.infra.GroupMemberRepository
 import com.mogumogu.momogo.group.infra.GroupRepository
+import com.mogumogu.momogo.photo.application.PhotoDownloadUrlGenerator
+import com.mogumogu.momogo.photo.domain.PhotoObjectKey
 import com.mogumogu.momogo.photo.infra.PhotoGroupRepository
+import com.mogumogu.momogo.reaction.domain.Emoji
+import com.mogumogu.momogo.reaction.domain.ReactionConcept
+import com.mogumogu.momogo.reaction.infra.PhotoReactionRepository
 import com.mogumogu.momogo.user.infra.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -21,8 +26,10 @@ class GroupService(
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
     private val photoGroupRepository: PhotoGroupRepository,
+    private val photoReactionRepository: PhotoReactionRepository,
     private val userRepository: UserRepository,
     private val inviteCodeGenerator: InviteCodeGenerator,
+    private val photoDownloadUrlGenerator: PhotoDownloadUrlGenerator,
     private val dailyTimeRangeFactory: DailyTimeRangeFactory,
     private val clock: Clock,
 ) {
@@ -71,9 +78,87 @@ class GroupService(
                 JoinedGroupResult(
                     groupId = groupId,
                     groupName = group.name,
+                    createdAt = LocalDateTime.ofInstant(group.createdAt, clock.zone),
                     totalMemberCount = totalMemberCount,
                     todayPhotoUploaderCount = photoUploaderCountByGroupId[groupId] ?: 0L,
                     latestUploadAt = latestUploadAtByGroupId[groupId],
+                )
+            },
+        )
+    }
+
+    @Transactional(readOnly = true)
+    fun getGroup(
+        userId: Long,
+        groupId: Long,
+        date: LocalDate?,
+    ): GetGroupResult {
+        val membership = groupMemberRepository.findJoinedWithActiveGroupByUserIdAndGroupId(
+            userId = userId,
+            groupId = groupId,
+        ) ?: throwGroupAccessException(groupId)
+        val group = membership.group
+        val timeRange = try {
+            date?.let(dailyTimeRangeFactory::create) ?: dailyTimeRangeFactory.today()
+        } catch (_: java.time.DateTimeException) {
+            throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
+        }
+        val members = groupMemberRepository.findJoinedMemberViewsByGroupId(
+            groupId = groupId,
+            requestUserId = userId,
+        )
+        val photoViews = photoGroupRepository.findActiveMemberPhotosByGroupIdAndCreatedAtRange(
+            groupId = groupId,
+            startAt = timeRange.startAt,
+            endAt = timeRange.endAt,
+        )
+        val photosByUploaderId = buildMap {
+            photoViews.forEach { photo -> putIfAbsent(photo.uploaderId, photo) }
+        }
+        val latestReactionByPhotoGroupId = if (photoViews.isEmpty()) {
+            emptyMap()
+        } else {
+            photoReactionRepository.findLatestByPhotoGroupIds(
+                photoViews.map { photo -> photo.photoGroupId },
+            ).associateBy { reaction -> reaction.photoGroupId }
+        }
+
+        return GetGroupResult(
+            groupId = groupId,
+            groupName = group.name,
+            createdAt = LocalDateTime.ofInstant(group.createdAt, clock.zone),
+            date = timeRange.date,
+            members = members.map { member ->
+                val photo = photosByUploaderId[member.userId]
+                GroupMemberResult(
+                    userId = member.userId,
+                    nickname = member.nickname,
+                    mine = member.userId == userId,
+                    photo = photo?.let {
+                        val generatedUrl = photoDownloadUrlGenerator.generate(
+                            PhotoObjectKey.parse(it.objectKey),
+                        )
+                        val latestReaction = latestReactionByPhotoGroupId[it.photoGroupId]
+                        GroupPhotoResult(
+                            photoId = it.photoId,
+                            downloadUrl = generatedUrl.downloadUrl,
+                            contentType = it.contentType,
+                            createdAt = LocalDateTime.ofInstant(it.createdAt, clock.zone),
+                            expiresAt = generatedUrl.expiresAt,
+                            latestReaction = latestReaction?.let { reaction ->
+                                LatestPhotoReactionResult(
+                                    reactionId = reaction.reactionId,
+                                    userId = reaction.userId,
+                                    nickname = reaction.nickname,
+                                    concept = reaction.concept,
+                                    emoji = reaction.emoji,
+                                    comment = reaction.comment,
+                                    createdAt = LocalDateTime.ofInstant(reaction.createdAt, clock.zone),
+                                    mine = reaction.userId == userId,
+                                )
+                            },
+                        )
+                    },
                 )
             },
         )
@@ -232,6 +317,13 @@ class GroupService(
             throw ApiException.Conflict(ErrorCode.GROUP_FULL)
         }
     }
+
+    private fun throwGroupAccessException(groupId: Long): Nothing {
+        if (groupRepository.existsActiveById(groupId)) {
+            throw ApiException.Forbidden(ErrorCode.NOT_GROUP_MEMBER)
+        }
+        throw ApiException.NotFound(ErrorCode.GROUP_NOT_FOUND)
+    }
 }
 
 data class GetJoinedGroupsResult(
@@ -242,9 +334,45 @@ data class GetJoinedGroupsResult(
 data class JoinedGroupResult(
     val groupId: Long,
     val groupName: String,
+    val createdAt: LocalDateTime,
     val totalMemberCount: Long,
     val todayPhotoUploaderCount: Long,
     val latestUploadAt: LocalDateTime?,
+)
+
+data class GetGroupResult(
+    val groupId: Long,
+    val groupName: String,
+    val createdAt: LocalDateTime,
+    val date: LocalDate,
+    val members: List<GroupMemberResult>,
+)
+
+data class GroupMemberResult(
+    val userId: Long,
+    val nickname: String,
+    val mine: Boolean,
+    val photo: GroupPhotoResult?,
+)
+
+data class GroupPhotoResult(
+    val photoId: Long,
+    val downloadUrl: String,
+    val contentType: String,
+    val createdAt: LocalDateTime,
+    val expiresAt: LocalDateTime,
+    val latestReaction: LatestPhotoReactionResult?,
+)
+
+data class LatestPhotoReactionResult(
+    val reactionId: Long,
+    val userId: Long,
+    val nickname: String,
+    val concept: ReactionConcept,
+    val emoji: Emoji,
+    val comment: String,
+    val createdAt: LocalDateTime,
+    val mine: Boolean,
 )
 
 data class CreateGroupCommand(

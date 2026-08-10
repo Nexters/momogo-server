@@ -47,7 +47,8 @@ class PhotoController(
 
     @Operation(
         summary = "날짜별 내 사진 조회",
-        description = "현재 사용자가 지정한 날짜(Asia/Seoul)에 올린 사진을 최신순으로 조회합니다. 사진이 없으면 빈 목록을 반환합니다.",
+        description = "현재 사용자가 지정한 날짜(Asia/Seoul)에 올린 사진을 최신순으로 조회합니다. " +
+            "날짜를 생략하면 오늘을 조회하며, 사진이 없으면 빈 목록을 반환합니다.",
     )
     @ApiExamples(success = OpenApiExample.MY_PHOTOS_RESPONSE)
     @ApiErrors(badRequest = [ErrorCode.INVALID_REQUEST])
@@ -58,20 +59,18 @@ class PhotoController(
         @Parameter(
             description = "사진을 조회할 날짜(Asia/Seoul)",
             example = "2026-08-03",
-            required = true,
+            required = false,
             schema = Schema(type = "string", format = "date"),
         )
-        // 누락된 date도 공통 code 필드를 포함한 INVALID_REQUEST 응답으로 변환하기 위해 nullable로 받는다.
         @RequestParam(name = "date", required = false)
         dateValue: String?,
     ): MyPhotosResponse {
-        if (dateValue == null) {
-            throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
-        }
-        val date = try {
-            LocalDate.parse(dateValue)
-        } catch (_: DateTimeException) {
-            throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
+        val date = dateValue?.let {
+            try {
+                LocalDate.parse(it)
+            } catch (_: DateTimeException) {
+                throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
+            }
         }
         val result = photoQueryService.getMyPhotos(userId, date)
 

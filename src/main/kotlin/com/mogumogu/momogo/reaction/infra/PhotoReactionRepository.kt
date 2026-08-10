@@ -10,6 +10,40 @@ import org.springframework.data.repository.query.Param
 import java.time.Instant
 
 interface PhotoReactionRepository : JpaRepository<PhotoReaction, Long> {
+    @Query(
+        """
+        SELECT new com.mogumogu.momogo.reaction.infra.LatestPhotoReactionView(
+            photoReaction._photoGroup._id,
+            photoReaction._id,
+            reactor._id,
+            reactor._nickname,
+            photoReaction._concept,
+            photoReaction._emoji,
+            photoReaction._comment,
+            photoReaction._createdAt
+        )
+        FROM PhotoReaction photoReaction
+        JOIN photoReaction._user reactor
+        WHERE photoReaction._photoGroup._id IN :photoGroupIds
+          AND NOT EXISTS (
+              SELECT newerReaction._id
+              FROM PhotoReaction newerReaction
+              WHERE newerReaction._photoGroup = photoReaction._photoGroup
+                AND (
+                    newerReaction._createdAt > photoReaction._createdAt
+                    OR (
+                        newerReaction._createdAt = photoReaction._createdAt
+                        AND newerReaction._id > photoReaction._id
+                    )
+                )
+          )
+        """,
+    )
+    fun findLatestByPhotoGroupIds(
+        @Param("photoGroupIds")
+        photoGroupIds: List<Long>,
+    ): List<LatestPhotoReactionView>
+
     // 목록에 작성자 닉네임이 필요하다. 엔티티를 그대로 조회하면 _user가 LAZY라 리액션 수만큼 쿼리가 나가므로
     // DTO 프로젝션으로 필요한 컬럼만 뽑는다.
     @Query(
@@ -72,6 +106,17 @@ interface PhotoReactionRepository : JpaRepository<PhotoReaction, Long> {
 }
 
 data class PhotoReactionView(
+    val reactionId: Long,
+    val userId: Long,
+    val nickname: String,
+    val concept: ReactionConcept,
+    val emoji: Emoji,
+    val comment: String,
+    val createdAt: Instant,
+)
+
+data class LatestPhotoReactionView(
+    val photoGroupId: Long,
     val reactionId: Long,
     val userId: Long,
     val nickname: String,

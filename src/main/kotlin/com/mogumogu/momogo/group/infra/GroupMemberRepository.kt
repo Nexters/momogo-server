@@ -15,6 +15,24 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         FROM GroupMember gm
         JOIN FETCH gm._group g
         WHERE gm._user._id = :userId
+          AND g._id = :groupId
+          AND gm._deletedAt IS NULL
+          AND g._deletedAt IS NULL
+        """,
+    )
+    fun findJoinedWithActiveGroupByUserIdAndGroupId(
+        @Param("userId")
+        userId: Long,
+        @Param("groupId")
+        groupId: Long,
+    ): GroupMember?
+
+    @Query(
+        """
+        SELECT gm
+        FROM GroupMember gm
+        JOIN FETCH gm._group g
+        WHERE gm._user._id = :userId
           AND gm._deletedAt IS NULL
           AND g._deletedAt IS NULL
         ORDER BY gm._id DESC
@@ -88,6 +106,28 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
 
     @Query(
         """
+        SELECT new com.mogumogu.momogo.group.infra.JoinedGroupMemberView(
+            member._user._id,
+            member._user._nickname
+        )
+        FROM GroupMember member
+        WHERE member._group._id = :groupId
+          AND member._deletedAt IS NULL
+        ORDER BY
+            CASE WHEN member._user._id = :requestUserId THEN 0 ELSE 1 END,
+            member._user._nickname,
+            member._user._id
+        """,
+    )
+    fun findJoinedMemberViewsByGroupId(
+        @Param("groupId")
+        groupId: Long,
+        @Param("requestUserId")
+        requestUserId: Long,
+    ): List<JoinedGroupMemberView>
+
+    @Query(
+        """
         SELECT COUNT(gm)
         FROM GroupMember gm
         WHERE gm._group._id = :groupId
@@ -132,4 +172,9 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
 data class GroupMemberCount(
     val groupId: Long,
     val totalMemberCount: Long,
+)
+
+data class JoinedGroupMemberView(
+    val userId: Long,
+    val nickname: String,
 )

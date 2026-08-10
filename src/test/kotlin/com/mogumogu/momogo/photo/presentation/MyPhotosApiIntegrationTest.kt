@@ -176,12 +176,31 @@ class MyPhotosApiIntegrationTest(
         }
     }
 
+    given("조회 날짜를 생략하면") {
+        `when`("내 사진을 조회할 때") {
+            then("오늘 날짜의 사진을 반환한다") {
+                val viewer = register("my-photos-default-today")
+                val today = LocalDate.now(clock)
+                val todayPhoto = savePhoto(viewer.user, today.atTime(12, 0))
+                savePhoto(viewer.user, today.minusDays(1).atTime(12, 0))
+
+                val response = getMyPhotos(viewer.accessToken, dateValue = null)
+
+                response.status shouldBe HttpStatus.OK.value()
+                val body = objectMapper.readTree(response.contentAsString)
+                body["date"].stringValue() shouldBe today.toString()
+                body["photos"].size() shouldBe 1
+                body["photos"][0]["photoId"].longValue() shouldBe requireNotNull(todayPhoto.id)
+            }
+        }
+    }
+
     given("날짜 형식이 올바르지 않으면") {
         `when`("내 사진을 조회할 때") {
             then("INVALID_REQUEST 오류를 반환한다") {
                 val viewer = register("my-photos-invalid-date")
 
-                listOf(null, "2026-13-40", LocalDate.MAX.toString()).forEach { dateValue ->
+                listOf("2026-13-40", LocalDate.MAX.toString()).forEach { dateValue ->
                     assertProblem(
                         response = getMyPhotos(viewer.accessToken, dateValue),
                         status = HttpStatus.BAD_REQUEST,
