@@ -1,0 +1,58 @@
+name: API integration / dev
+
+on:
+  workflow_run:
+    workflows: ["CD / dev"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      enable_photo_report:
+        description: "R2 업로드와 Discord 사진 신고 1건 실행"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-integration-dev
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Postman integration test
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout deployed revision
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Prepare report directory
+        run: mkdir -p build/postman
+
+      - name: Run Postman collection
+        uses: postmanlabs/postman-cli-action@v1
+        with:
+          postman-cli-version: "1.45.0"
+          command: >-
+            collection run postman/momogo-dev.postman_collection.json
+            --environment postman/momogo-dev.postman_environment.json
+            --iteration-count 1
+            --env-var enablePhotoReport=${{ inputs.enable_photo_report || 'false' }}
+            --timeout-request 15000
+            --reporters cli,junit
+            --reporter-junit-export build/postman/results.xml
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: postman-integration-report
+          path: build/postman/results.xml
+          if-no-files-found: warn
+          retention-days: 7
