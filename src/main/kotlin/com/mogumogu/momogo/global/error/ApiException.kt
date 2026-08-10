@@ -76,4 +76,13 @@ sealed class ApiException(
         errorCode = errorCode,
         detail = detail,
     )
+
+    class InternalServerError(
+        errorCode: ErrorCode,
+        detail: String = errorCode.message,
+    ) : ApiException(
+        status = HttpStatus.INTERNAL_SERVER_ERROR,
+        errorCode = errorCode,
+        detail = detail,
+    )
 }

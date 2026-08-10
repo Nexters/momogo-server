@@ -57,6 +57,9 @@ enum class ErrorCode(
     REACTION_NOT_FOUND(
         message = "리액션을 찾을 수 없습니다.",
     ),
+    PHOTO_REPORT_NOTIFICATION_FAILED(
+        message = "사진 신고 접수에 실패했습니다.",
+    ),
     OBJECT_NOT_UPLOADED(
         message = "업로드된 사진 파일을 찾을 수 없습니다.",
     ),

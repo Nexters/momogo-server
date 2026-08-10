@@ -29,6 +29,9 @@ logging:
     org.hibernate.orm.jdbc.bind: TRACE
 
 momogo:
+  report:
+    discord:
+      webhook-url: ${PHOTO_REPORT_DISCORD_WEBHOOK_URL:https://discord.com/api/webhooks/0/not-configured}
   storage:
     r2:
       endpoint: ${R2_ENDPOINT:https://00000000000000000000000000000000.r2.cloudflarestorage.com}

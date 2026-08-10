@@ -19,6 +19,9 @@ logging:
     root: WARN
 
 momogo:
+  report:
+    discord:
+      webhook-url: https://discord.com/api/webhooks/0/not-configured
   storage:
     r2:
       endpoint: https://00000000000000000000000000000000.r2.cloudflarestorage.com
