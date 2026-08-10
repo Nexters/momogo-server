@@ -79,6 +79,8 @@ class OpenApiDocumentationTest(
                     .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/groups/{groupId}/photos/{photoId}/reactions", "get")
                     .requiresBearerAuth() shouldBe true
+                document.operation("/api/v1/groups/{groupId}/photos/{photoId}/reports", "post")
+                    .requiresBearerAuth() shouldBe true
                 document.operation(
                     "/api/v1/groups/{groupId}/photos/{photoId}/reactions/{reactionId}",
                     "delete",
@@ -141,6 +143,10 @@ class OpenApiDocumentationTest(
                     "/api/v1/groups/{groupId}/photos/{photoId}/reactions/{reactionId}",
                     "delete",
                 )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
+                document.operation(
+                    "/api/v1/groups/{groupId}/photos/{photoId}/reports",
+                    "post",
+                )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
 
                 val commonResponse = document["components"]["responses"][
                     OpenApiConfiguration.BEARER_UNAUTHORIZED_RESPONSE
@@ -190,6 +196,13 @@ class OpenApiDocumentationTest(
                 }["required"].booleanValue() shouldBe false
                 document.operation("/api/v1/photos", "post")
                     .hasParameter("userId") shouldBe false
+                val reportPhoto = document.operation(
+                    "/api/v1/groups/{groupId}/photos/{photoId}/reports",
+                    "post",
+                )
+                reportPhoto.hasParameter("userId") shouldBe false
+                reportPhoto.hasParameter("groupId") shouldBe true
+                reportPhoto.hasParameter("photoId") shouldBe true
             }
 
             then("user, auth, group과 photo API의 설명과 주요 응답을 제공한다") {
@@ -215,6 +228,10 @@ class OpenApiDocumentationTest(
                 val createPhoto = document.operation("/api/v1/photos", "post")
                 val createPhotoReaction = document.operation(
                     "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
+                    "post",
+                )
+                val reportPhoto = document.operation(
+                    "/api/v1/groups/{groupId}/photos/{photoId}/reports",
                     "post",
                 )
                 val checkAppVersion = document.operation("/init/versions", "get")
@@ -317,6 +334,15 @@ class OpenApiDocumentationTest(
                 createPhotoReaction.hasResponseMediaType("400", "application/problem+json") shouldBe true
                 createPhotoReaction.hasResponseMediaType("403", "application/problem+json") shouldBe true
                 createPhotoReaction.hasResponseMediaType("404", "application/problem+json") shouldBe true
+                reportPhoto["summary"].stringValue() shouldBe "사진 신고"
+                reportPhoto.responseCodes() shouldBe setOf("200", "400", "401", "403", "404", "500")
+                reportPhoto.hasResponseMediaType("200", "application/json") shouldBe true
+                reportPhoto.hasResponseMediaType("400", "application/problem+json") shouldBe true
+                reportPhoto.hasResponseMediaType("403", "application/problem+json") shouldBe true
+                reportPhoto.hasResponseMediaType("404", "application/problem+json") shouldBe true
+                reportPhoto.hasResponseMediaType("500", "application/problem+json") shouldBe true
+                reportPhoto.parameter("groupId")["example"].intValue() shouldBe 10
+                reportPhoto.parameter("photoId")["example"].intValue() shouldBe 501
                 checkAppVersion["summary"].stringValue() shouldBe "앱 버전 체크"
                 checkAppVersion.responseCodes() shouldBe setOf("200", "400")
                 checkAppVersion.hasResponseMediaType("200", "application/json") shouldBe true
@@ -576,6 +602,11 @@ class OpenApiDocumentationTest(
                     setOf("groupId", "code")
                 joinGroupSchema["properties"]["groupId"]["type"].stringValue() shouldBe "integer"
                 joinGroupSchema["properties"]["code"]["type"].stringValue() shouldBe "string"
+
+                schemas["PhotoReportRequest"]["required"].stringValues().toSet() shouldBe
+                    setOf("reason")
+                schemas["PhotoReportRequest"]["properties"]["reason"]["maxLength"]
+                    .intValue() shouldBe 500
             }
         }
 
@@ -749,6 +780,14 @@ private val operationExampleExpectations = listOf(
         method = "get",
         success = OpenApiExample.PHOTO_REACTIONS_RESPONSE,
         successSchema = "PhotoReactionsResponse",
+    ),
+    OperationExampleExpectation(
+        path = "/api/v1/groups/{groupId}/photos/{photoId}/reports",
+        method = "post",
+        request = OpenApiExample.PHOTO_REPORT_REQUEST,
+        requestSchema = "PhotoReportRequest",
+        success = OpenApiExample.EMPTY_OBJECT_RESPONSE,
+        successSchema = null,
     ),
 )
 
@@ -1002,6 +1041,30 @@ private val errorResponseExpectations = listOf(
         "delete",
         "404",
         setOf(ErrorCode.REACTION_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}/reports",
+        "post",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}/reports",
+        "post",
+        "403",
+        setOf(ErrorCode.NOT_GROUP_MEMBER),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}/reports",
+        "post",
+        "404",
+        setOf(ErrorCode.PHOTO_NOT_FOUND),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}/reports",
+        "post",
+        "500",
+        setOf(ErrorCode.PHOTO_REPORT_NOTIFICATION_FAILED),
     ),
 )
 

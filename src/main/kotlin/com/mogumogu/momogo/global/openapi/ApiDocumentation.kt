@@ -303,6 +303,13 @@ enum class OpenApiExample(
             "comment" to "야르~",
         ),
     ),
+    PHOTO_REPORT_REQUEST(
+        componentName = "PhotoReportRequestExample",
+        summary = "사진 신고 요청",
+        value = mapOf(
+            "reason" to "부적절한 사진이 포함되어 있습니다.",
+        ),
+    ),
     PHOTO_REACTION_CREATE_RESPONSE(
         componentName = "PhotoReactionCreateResponseExample",
         summary = "사진 리액션 등록 성공 응답",

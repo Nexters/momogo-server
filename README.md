@@ -45,6 +45,14 @@ R2 업로드가 끝나면 `POST /api/v1/photos`에 `objectKey`와 사진을 공�
 
 dev와 prod는 Hibernate가 DB 스키마를 자동 변경하지 않고 검증만 하므로, 엔티티 변경에 필요한 DDL은 배포 전에 대상 DB에 직접 적용해야 한다.
 
+## 사진 신고 Discord 알림 설정
+
+`POST /api/v1/groups/{groupId}/photos/{photoId}/reports`는 현재 그룹 멤버가 활성 사진을 사유와 함께 신고하는 API다. 서버는 실행 환경(DEV/PROD), 신고자 ID, 그룹 ID, 사진 ID와 사유를 Discord 웹훅으로 전송하고, Discord가 메시지 저장을 확인한 경우에만 성공을 반환한다.
+
+- `PHOTO_REPORT_DISCORD_WEBHOOK_URL`: Discord에서 발급한 전체 incoming webhook URL
+
+웹훅 URL에는 채널에 메시지를 보낼 수 있는 토큰이 포함되므로 저장소나 로그에 남기지 않고 환경별 `.env`에만 저장한다. local 프로필의 기본 URL은 애플리케이션 실행용 placeholder라서 실제 신고 전송에는 환경변수를 지정해야 하며, dev와 prod에서는 필수다. 신고 사유로 예상하지 않은 사용자·역할 멘션이 발생하지 않도록 Discord의 `allowed_mentions`를 비워서 전송한다. 자세한 요청 형식은 [Discord Execute Webhook 문서](https://docs.discord.com/developers/resources/webhook#execute-webhook)를 참고한다.
+
 ## Docker Compose 배포
 
 dev와 prod는 각각 `deploy/compose.dev.yml`, `deploy/compose.prod.yml`을 사용한다. 두 환경 모두 애플리케이션 포트는 호스트의 loopback 주소에만 공개하므로, 외부 요청은 같은 서버의 리버스 프록시를 통해 전달해야 한다.
