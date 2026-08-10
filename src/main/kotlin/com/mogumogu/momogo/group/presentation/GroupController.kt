@@ -1,6 +1,7 @@
 package com.mogumogu.momogo.group.presentation
 
 import com.mogumogu.momogo.global.config.OpenApiConfiguration
+import com.mogumogu.momogo.global.error.ApiException
 import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.global.openapi.ApiErrors
 import com.mogumogu.momogo.global.openapi.ApiExamples
@@ -12,6 +13,8 @@ import com.mogumogu.momogo.group.application.GroupService
 import com.mogumogu.momogo.group.application.JoinGroupCommand
 import com.mogumogu.momogo.group.application.LeaveGroupCommand
 import com.mogumogu.momogo.group.application.UpdateGroupCommand
+import com.mogumogu.momogo.reaction.domain.Emoji
+import com.mogumogu.momogo.reaction.domain.ReactionConcept
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Schema
@@ -19,6 +22,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.Size
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.time.DateTimeException
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -63,9 +68,87 @@ class GroupController(
                 JoinedGroupResponse(
                     groupId = group.groupId,
                     groupName = group.groupName,
+                    createdAt = group.createdAt,
                     totalMemberCount = group.totalMemberCount,
                     todayPhotoUploaderCount = group.todayPhotoUploaderCount,
                     latestUploadAt = group.latestUploadAt,
+                )
+            },
+        )
+    }
+
+    @Operation(
+        summary = "날짜별 그룹 사진 조회",
+        description = "현재 그룹원과 지정한 날짜(Asia/Seoul)에 각 그룹원이 올린 활성 사진을 조회합니다. " +
+            "날짜를 생략하면 오늘을 조회하며, 사진이 없는 그룹원도 photo가 null인 상태로 반환합니다.",
+    )
+    @ApiExamples(success = OpenApiExample.GROUP_DETAIL_RESPONSE)
+    @ApiErrors(
+        badRequest = [ErrorCode.INVALID_REQUEST],
+        forbidden = [ErrorCode.NOT_GROUP_MEMBER],
+        notFound = [ErrorCode.GROUP_NOT_FOUND],
+    )
+    @GetMapping("/{groupId}")
+    fun getGroup(
+        @RequestUserId
+        userId: Long,
+        @Parameter(example = "10")
+        @Positive(message = "groupId는 0보다 커야 합니다.")
+        @PathVariable
+        groupId: Long,
+        @Parameter(
+            description = "그룹 사진을 조회할 날짜(Asia/Seoul). 생략하면 오늘",
+            example = "2026-08-05",
+            required = false,
+            schema = Schema(type = "string", format = "date"),
+        )
+        @RequestParam(name = "date", required = false)
+        dateValue: String?,
+    ): GroupDetailResponse {
+        val date = dateValue?.let {
+            try {
+                LocalDate.parse(it)
+            } catch (_: DateTimeException) {
+                throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
+            }
+        }
+        val result = groupService.getGroup(
+            userId = userId,
+            groupId = groupId,
+            date = date,
+        )
+
+        return GroupDetailResponse(
+            groupId = result.groupId,
+            groupName = result.groupName,
+            createdAt = result.createdAt,
+            date = result.date,
+            members = result.members.map { member ->
+                GroupMemberResponse(
+                    userId = member.userId,
+                    nickname = member.nickname,
+                    mine = member.mine,
+                    photo = member.photo?.let { photo ->
+                        GroupPhotoResponse(
+                            photoId = photo.photoId,
+                            downloadUrl = photo.downloadUrl,
+                            contentType = photo.contentType,
+                            createdAt = photo.createdAt,
+                            expiresAt = photo.expiresAt,
+                            latestReaction = photo.latestReaction?.let { reaction ->
+                                LatestPhotoReactionResponse(
+                                    reactionId = reaction.reactionId,
+                                    userId = reaction.userId,
+                                    nickname = reaction.nickname,
+                                    concept = reaction.concept,
+                                    emoji = reaction.emoji,
+                                    comment = reaction.comment,
+                                    createdAt = reaction.createdAt,
+                                    mine = reaction.mine,
+                                )
+                            },
+                        )
+                    },
                 )
             },
         )
@@ -274,6 +357,15 @@ data class JoinedGroupResponse(
     val groupName: String,
 
     @field:Schema(
+        description = "그룹 생성 시각(Asia/Seoul)",
+        example = "2026-08-01T09:00:00.123456",
+        type = "string",
+        format = "date-time",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val createdAt: LocalDateTime,
+
+    @field:Schema(
         description = "현재 그룹에 참여 중인 멤버 수",
         example = "4",
         minimum = "1",
@@ -301,6 +393,188 @@ data class JoinedGroupResponse(
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val latestUploadAt: LocalDateTime?,
+)
+
+@Schema(description = "날짜별 그룹 사진 조회 응답")
+data class GroupDetailResponse(
+    @field:Schema(
+        description = "그룹 ID",
+        example = "10",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val groupId: Long,
+
+    @field:Schema(
+        description = "그룹명",
+        example = "우리 가족",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val groupName: String,
+
+    @field:Schema(
+        description = "그룹 생성 시각(Asia/Seoul)",
+        example = "2026-08-01T09:00:00.123456",
+        type = "string",
+        format = "date-time",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val createdAt: LocalDateTime,
+
+    @field:Schema(
+        description = "그룹 사진을 조회한 날짜(Asia/Seoul)",
+        example = "2026-08-05",
+        type = "string",
+        format = "date",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val date: LocalDate,
+
+    @field:Schema(
+        description = "현재 그룹원 목록. 요청 사용자가 먼저이며 나머지는 닉네임순",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val members: List<GroupMemberResponse>,
+)
+
+@Schema(description = "그룹원과 선택 날짜의 사진")
+data class GroupMemberResponse(
+    @field:Schema(
+        description = "그룹원 사용자 ID",
+        example = "1",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val userId: Long,
+
+    @field:Schema(
+        description = "그룹원 닉네임",
+        example = "모모",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val nickname: String,
+
+    @field:Schema(
+        description = "현재 사용자인지 여부",
+        example = "true",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val mine: Boolean,
+
+    @field:Schema(
+        description = "선택 날짜에 그룹원이 올린 활성 사진. 없으면 null",
+        nullable = true,
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val photo: GroupPhotoResponse?,
+)
+
+@Schema(description = "그룹에 등록된 사진과 최신 반응")
+data class GroupPhotoResponse(
+    @field:Schema(
+        description = "사진 ID",
+        example = "501",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val photoId: Long,
+
+    @field:Schema(
+        description = "이미지 바이너리에 바로 접근할 수 있는 R2 presigned GET URL",
+        format = "uri",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val downloadUrl: String,
+
+    @field:Schema(
+        description = "이미지 MIME 타입",
+        example = "image/webp",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val contentType: String,
+
+    @field:Schema(
+        description = "사진이 그룹에 등록된 시각(Asia/Seoul)",
+        example = "2026-08-05T12:30:00.123456",
+        type = "string",
+        format = "date-time",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val createdAt: LocalDateTime,
+
+    @field:Schema(
+        description = "다운로드 URL 만료 시각(Asia/Seoul)",
+        example = "2026-08-05T12:45:00.123456",
+        type = "string",
+        format = "date-time",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val expiresAt: LocalDateTime,
+
+    @field:Schema(
+        description = "사진에 등록된 가장 최신 반응. 없으면 null",
+        nullable = true,
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val latestReaction: LatestPhotoReactionResponse?,
+)
+
+@Schema(description = "사진에 등록된 가장 최신 반응")
+data class LatestPhotoReactionResponse(
+    @field:Schema(
+        description = "리액션 ID",
+        example = "901",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val reactionId: Long,
+
+    @field:Schema(
+        description = "리액션을 남긴 사용자 ID",
+        example = "2",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val userId: Long,
+
+    @field:Schema(
+        description = "리액션을 남긴 사용자 닉네임",
+        example = "모고",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val nickname: String,
+
+    @field:Schema(
+        description = "리액션 컨셉",
+        example = "YOUNG_CREATOR_CREW",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val concept: ReactionConcept,
+
+    @field:Schema(
+        description = "리액션 이모지",
+        example = "DELICIOUS",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val emoji: Emoji,
+
+    @field:Schema(
+        description = "리액션 문구",
+        example = "야르~",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val comment: String,
+
+    @field:Schema(
+        description = "리액션 등록 시각(Asia/Seoul)",
+        example = "2026-08-05T13:00:00.123456",
+        type = "string",
+        format = "date-time",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val createdAt: LocalDateTime,
+
+    @field:Schema(
+        description = "현재 사용자가 남긴 리액션인지 여부",
+        example = "false",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val mine: Boolean,
 )
 
 @Schema(description = "그룹 생성 요청")

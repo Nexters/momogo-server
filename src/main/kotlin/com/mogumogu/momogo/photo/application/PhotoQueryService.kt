@@ -23,10 +23,10 @@ class PhotoQueryService(
     @Transactional(readOnly = true)
     fun getMyPhotos(
         userId: Long,
-        date: LocalDate,
+        date: LocalDate?,
     ): MyPhotosResult {
         val timeRange = try {
-            dailyTimeRangeFactory.create(date)
+            date?.let(dailyTimeRangeFactory::create) ?: dailyTimeRangeFactory.today()
         } catch (_: DateTimeException) {
             throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
         }
@@ -37,7 +37,7 @@ class PhotoQueryService(
         )
 
         return MyPhotosResult(
-            date = date,
+            date = timeRange.date,
             photos = photos.map { photo ->
                 val generated = downloadUrlGenerator.generate(PhotoObjectKey.parse(photo.objectKey))
                 PhotoResult(

@@ -9,6 +9,19 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface GroupRepository : JpaRepository<Group, Long> {
+    @Query(
+        """
+        SELECT CASE WHEN COUNT(g) > 0 THEN true ELSE false END
+        FROM Group g
+        WHERE g._id = :groupId
+          AND g._deletedAt IS NULL
+        """,
+    )
+    fun existsActiveById(
+        @Param("groupId")
+        groupId: Long,
+    ): Boolean
+
     @Query("SELECT g FROM Group g WHERE g._inviteCode = :inviteCode")
     fun findByInviteCode(
         @Param("inviteCode")

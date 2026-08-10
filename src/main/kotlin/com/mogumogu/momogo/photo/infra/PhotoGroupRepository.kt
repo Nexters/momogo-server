@@ -25,6 +25,42 @@ interface PhotoGroupRepository : JpaRepository<PhotoGroup, Long> {
 
     @Query(
         """
+        SELECT new com.mogumogu.momogo.photo.infra.GroupMemberPhotoView(
+            pg._id,
+            photo._id,
+            uploader._id,
+            photo._objectKey,
+            photo._contentType,
+            pg._createdAt
+        )
+        FROM PhotoGroup pg
+        JOIN pg._photo photo
+        JOIN photo._uploader uploader
+        WHERE pg._group._id = :groupId
+          AND pg._deletedAt IS NULL
+          AND pg._createdAt >= :startAt
+          AND pg._createdAt < :endAt
+          AND EXISTS (
+              SELECT member._id
+              FROM GroupMember member
+              WHERE member._group = pg._group
+                AND member._user = uploader
+                AND member._deletedAt IS NULL
+          )
+        ORDER BY pg._createdAt DESC, pg._id DESC
+        """,
+    )
+    fun findActiveMemberPhotosByGroupIdAndCreatedAtRange(
+        @Param("groupId")
+        groupId: Long,
+        @Param("startAt")
+        startAt: Instant,
+        @Param("endAt")
+        endAt: Instant,
+    ): List<GroupMemberPhotoView>
+
+    @Query(
+        """
         SELECT new com.mogumogu.momogo.photo.infra.TodayPhotoUploaderCount(
             pg._group._id,
             COUNT(DISTINCT uploader._id)
@@ -110,4 +146,13 @@ data class TodayPhotoUploaderCount(
 data class LatestGroupUpload(
     val groupId: Long,
     val latestUploadAt: Instant,
+)
+
+data class GroupMemberPhotoView(
+    val photoGroupId: Long,
+    val photoId: Long,
+    val uploaderId: Long,
+    val objectKey: String,
+    val contentType: String,
+    val createdAt: Instant,
 )
