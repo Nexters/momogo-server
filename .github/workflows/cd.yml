@@ -15,9 +15,6 @@ on:
         description: Source branch name
         required: true
         type: string
-    secrets:
-      DISCORD_WEBHOOK_URL:
-        required: true
   workflow_dispatch:
     inputs:
       target:
@@ -56,16 +53,9 @@ jobs:
         run: echo "IMAGE_REPOSITORY=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - name: Validate publish target
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           if [[ ! "$IMAGE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
             echo "revision must be a full Git SHA" >&2
-            exit 1
-          fi
-
-          if [[ -z "$DISCORD_WEBHOOK_URL" ]]; then
-            echo "DISCORD_WEBHOOK_URL secret is required" >&2
             exit 1
           fi
 
@@ -102,9 +92,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
@@ -112,145 +99,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Find previous published revision
-        id: previous
-        run: |
-          previous_revision=""
-          image_reference="$IMAGE_REPOSITORY:$IMAGE_TAGS"
-
-          if manifest=$(docker buildx imagetools inspect \
-            "$image_reference" \
-            --format '{{json .Manifest}}' 2>/dev/null); then
-            platform_digest=$(jq -r '
-              [.manifests[]?
-                | select(.platform.os == "linux" and .platform.architecture == "amd64")
-                | .digest]
-              | first // empty
-            ' <<< "$manifest")
-
-            if [[ -n "$platform_digest" ]]; then
-              image_reference="$IMAGE_REPOSITORY@$platform_digest"
-            fi
-          fi
-
-          if labels=$(docker buildx imagetools inspect \
-            "$image_reference" \
-            --format '{{json .Image.Config.Labels}}' 2>/dev/null); then
-            candidate=$(jq -r '."org.opencontainers.image.revision" // empty' <<< "$labels")
-            if [[ "$candidate" =~ ^[0-9a-f]{40}$ ]]; then
-              previous_revision="$candidate"
-            fi
-          fi
-
-          echo "revision=$previous_revision" >> "$GITHUB_OUTPUT"
-
       - name: Run checks for manual publish
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: ./gradlew check --no-daemon
 
-      - name: Prepare commit summary
-        id: changes
-        env:
-          PREVIOUS_REVISION: ${{ steps.previous.outputs.revision }}
-        run: |
-          repository_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
-          comparison_url="$repository_url/commit/$IMAGE_REVISION"
-
-          if [[ -n "$PREVIOUS_REVISION" ]] && git cat-file -e "$PREVIOUS_REVISION^{commit}"; then
-            if [[ "$PREVIOUS_REVISION" == "$IMAGE_REVISION" ]]; then
-              commit_summary="변경된 커밋 없음 (동일 revision 재게시)"
-            else
-              comparison_url="$repository_url/compare/$PREVIOUS_REVISION...$IMAGE_REVISION"
-              commit_count=$(git rev-list --count "$PREVIOUS_REVISION..$IMAGE_REVISION")
-              commit_summary=""
-
-              while IFS=$'\t' read -r full_sha short_sha subject; do
-                subject="${subject:0:60}"
-                commit_summary+="• [\`$short_sha\`]($repository_url/commit/$full_sha) $subject"$'\n'
-              done < <(git log --max-count=5 --format='%H%x09%h%x09%s' "$PREVIOUS_REVISION..$IMAGE_REVISION")
-
-              if (( commit_count > 5 )); then
-                commit_summary+="• 그 외 $((commit_count - 5))개 커밋"$'\n'
-              fi
-
-              if [[ -z "$commit_summary" ]]; then
-                commit_summary="비교할 수 있는 새 커밋이 없습니다."
-              else
-                commit_summary="${commit_summary%$'\n'}"
-              fi
-            fi
-          else
-            short_sha=$(git rev-parse --short=8 "$IMAGE_REVISION")
-            subject=$(git show -s --format='%s' "$IMAGE_REVISION")
-            subject="${subject:0:60}"
-            commit_summary="• [\`$short_sha\`]($repository_url/commit/$IMAGE_REVISION) $subject"$'\n'"• 이전 이미지 revision 없음"
-          fi
-
-          {
-            echo "comparison_url=$comparison_url"
-            echo 'commit_summary<<__MOMOGO_COMMITS__'
-            printf '%s\n' "$commit_summary"
-            echo '__MOMOGO_COMMITS__'
-          } >> "$GITHUB_OUTPUT"
-
       - name: Build and push image with Jib
         run: ./gradlew jib --no-daemon
-
-      - name: Send Discord notification
-        env:
-          COMMIT_SUMMARY: ${{ steps.changes.outputs.commit_summary }}
-          COMPARISON_URL: ${{ steps.changes.outputs.comparison_url }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: |
-          image_digest=$(tr -d '\n' < build/jib-image.digest)
-          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          short_sha="${IMAGE_REVISION:0:8}"
-
-          if [[ "$IMAGE_TAGS" == "main" ]]; then
-            deployment_target="dev"
-            deployment_emoji="🧪"
-            color=3447003
-          else
-            deployment_target="production"
-            deployment_emoji="🚀"
-            color=15158332
-          fi
-
-          jq -n \
-            --arg title "$deployment_emoji $deployment_target 이미지 푸시 완료" \
-            --arg branch "$SOURCE_BRANCH" \
-            --arg actor "$GITHUB_ACTOR" \
-            --arg revision "$short_sha" \
-            --arg revision_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$IMAGE_REVISION" \
-            --arg image_sha "$IMAGE_REPOSITORY:$IMAGE_REVISION" \
-            --arg image_alias "$IMAGE_REPOSITORY:$IMAGE_TAGS" \
-            --arg digest "$image_digest" \
-            --arg commits "$COMMIT_SUMMARY" \
-            --arg comparison_url "$COMPARISON_URL" \
-            --arg run_url "$run_url" \
-            --arg timestamp "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-            --argjson color "$color" \
-            '{
-              username: "monogo-deploy",
-              allowed_mentions: {parse: []},
-              embeds: [{
-                title: $title,
-                url: $run_url,
-                color: $color,
-                fields: [
-                  {name: "브랜치", value: $branch, inline: true},
-                  {name: "실행자", value: $actor, inline: true},
-                  {name: "Revision", value: ("[" + $revision + "](" + $revision_url + ")"), inline: true},
-                  {name: "이미지", value: ("`" + $image_sha + "`\n`" + $image_alias + "`"), inline: false},
-                  {name: "Digest", value: ("`" + $digest + "`"), inline: false},
-                  {name: "배포 대상 커밋", value: $commits, inline: false},
-                  {name: "링크", value: ("[변경사항 비교](" + $comparison_url + ") · [Actions 실행](" + $run_url + ")"), inline: false}
-                ],
-                timestamp: $timestamp
-              }]
-            }' > "$RUNNER_TEMP/discord-payload.json"
-
-          curl --fail-with-body --silent --show-error \
-            -H 'Content-Type: application/json' \
-            --data-binary "@$RUNNER_TEMP/discord-payload.json" \
-            "$DISCORD_WEBHOOK_URL"

@@ -36,6 +36,13 @@ jobs:
         with:
           ref: ${{ env.IMAGE_REVISION }}
 
+      - name: Checkout notification script
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          sparse-checkout: scripts
+          path: notification-source
+
       - name: Upload deployment files
         uses: appleboy/scp-action@v1
         with:
@@ -64,3 +71,9 @@ jobs:
             cd /opt/momogo/deploy/dev
             chmod +x ./scripts/deploy.sh
             ./scripts/deploy.sh dev "$IMAGE_REVISION"
+
+      - name: Send Discord notification
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SOURCE_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+        run: ./notification-source/scripts/notify-deployment.sh dev "$IMAGE_REVISION" "$SOURCE_BRANCH"
