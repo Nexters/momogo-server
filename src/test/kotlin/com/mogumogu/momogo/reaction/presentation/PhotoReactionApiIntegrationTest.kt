@@ -188,6 +188,26 @@ class PhotoReactionApiIntegrationTest(
         body["code"].stringValue() shouldBe errorCode.name
     }
 
+    given("groupId가 양수가 아니면") {
+        `when`("리액션을 남길 때") {
+            then("400 INVALID_REQUEST로 거절한다") {
+                val user = register()
+
+                listOf(0L, -1L).forEach { invalidGroupId ->
+                    assertProblem(
+                        response = react(
+                            accessToken = user.accessToken,
+                            photoId = 1L,
+                            groupId = invalidGroupId,
+                        ),
+                        status = HttpStatus.BAD_REQUEST,
+                        errorCode = ErrorCode.INVALID_REQUEST,
+                    )
+                }
+            }
+        }
+    }
+
     given("그룹에 올라온 사진이 있으면") {
         `when`("그룹 멤버가 리액션을 남길 때") {
             then("리액션을 저장하고 등록 정보를 반환한다") {

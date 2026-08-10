@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Positive
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
@@ -156,6 +157,22 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
                 }
             }
         }
+
+        `when`("경로 변수 검증이 실패할 때") {
+            val response = mockMvc.perform(get("/test/numbers/0"))
+                .andReturn()
+                .response
+            val body = objectMapper.readTree(response.contentAsString)
+
+            then("공통 INVALID_REQUEST ProblemDetail로 응답한다") {
+                response.status shouldBe 400
+                response.contentType shouldBe MediaType.APPLICATION_PROBLEM_JSON_VALUE
+                body["status"].intValue() shouldBe 400
+                body["detail"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.message
+                body["instance"].stringValue() shouldBe "/test/numbers/0"
+                body["code"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.name
+            }
+        }
     }
 
     given("DB 무결성 위반이 발생하면") {
@@ -217,6 +234,7 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
         @GetMapping("/numbers/{number}")
         fun number(
             @PathVariable
+            @Positive
             number: Long,
         ) = number
 

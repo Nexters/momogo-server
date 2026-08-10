@@ -20,6 +20,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.Size
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -57,6 +58,7 @@ class PhotoReactionController(
         @RequestUserId
         userId: Long,
         @Parameter(example = "10")
+        @Positive(message = "groupId는 0보다 커야 합니다.")
         @PathVariable
         groupId: Long,
         @Parameter(example = "501")
@@ -112,6 +114,7 @@ class PhotoReactionController(
         @RequestUserId
         userId: Long,
         @Parameter(example = "10")
+        @Positive(message = "groupId는 0보다 커야 합니다.")
         @PathVariable
         groupId: Long,
         @Parameter(example = "501")
@@ -158,6 +161,7 @@ class PhotoReactionController(
         @RequestUserId
         userId: Long,
         @Parameter(example = "10")
+        @Positive(message = "groupId는 0보다 커야 합니다.")
         @PathVariable
         groupId: Long,
         @Parameter(example = "501")
