@@ -64,3 +64,9 @@ jobs:
             cd /opt/momogo/deploy/dev
             chmod +x ./scripts/deploy.sh
             ./scripts/deploy.sh dev "$IMAGE_REVISION"
+
+      - name: Send Discord notification
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SOURCE_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+        run: ./scripts/notify-deployment.sh dev "$IMAGE_REVISION" "$SOURCE_BRANCH"
