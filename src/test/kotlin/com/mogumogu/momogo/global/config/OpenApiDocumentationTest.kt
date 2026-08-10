@@ -418,13 +418,19 @@ class OpenApiDocumentationTest(
                     "groupName",
                     "totalMemberCount",
                     "todayPhotoUploaderCount",
+                    "latestUploadAt",
                 )
                 joinedGroupSchema["properties"].propertyNames().asSequence().toSet() shouldBe setOf(
                     "groupId",
                     "groupName",
                     "totalMemberCount",
                     "todayPhotoUploaderCount",
+                    "latestUploadAt",
                 )
+                joinedGroupSchema["properties"]["latestUploadAt"]["type"]
+                    .stringValues().toSet() shouldBe setOf("string", "null")
+                joinedGroupSchema["properties"]["latestUploadAt"]["format"].stringValue() shouldBe
+                    "date-time"
                 schemas["UpdateGroupRequest"]["properties"]["name"]["maxLength"]
                     .intValue() shouldBe 16
                 schemas["UpdateGroupRequest"]["required"].stringValues().toSet() shouldBe

@@ -148,6 +148,7 @@ enum class OpenApiExample(
                     "groupName" to "우리 가족",
                     "totalMemberCount" to 4,
                     "todayPhotoUploaderCount" to 2,
+                    "latestUploadAt" to "2026-08-10T14:30:00.123456",
                 ),
             ),
         ),

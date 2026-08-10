@@ -57,6 +57,28 @@ interface PhotoGroupRepository : JpaRepository<PhotoGroup, Long> {
 
     @Query(
         """
+        SELECT new com.mogumogu.momogo.photo.infra.LatestGroupUpload(
+            pg._group._id,
+            MAX(pg._createdAt)
+        )
+        FROM PhotoGroup pg
+        JOIN pg._photo photo
+        LEFT JOIN photo._uploader uploader
+        WHERE pg._group._id IN :groupIds
+          AND pg._deletedAt IS NULL
+          AND (uploader._id IS NULL OR uploader._id <> :userId)
+        GROUP BY pg._group._id
+        """,
+    )
+    fun findLatestUploadsByGroupIdsExcludingUserId(
+        @Param("groupIds")
+        groupIds: List<Long>,
+        @Param("userId")
+        userId: Long,
+    ): List<LatestGroupUpload>
+
+    @Query(
+        """
         SELECT CASE WHEN COUNT(pg) > 0 THEN true ELSE false END
         FROM PhotoGroup pg
         JOIN pg._photo photo
@@ -83,4 +105,9 @@ interface PhotoGroupRepository : JpaRepository<PhotoGroup, Long> {
 data class TodayPhotoUploaderCount(
     val groupId: Long,
     val uploaderCount: Long,
+)
+
+data class LatestGroupUpload(
+    val groupId: Long,
+    val latestUploadAt: Instant,
 )

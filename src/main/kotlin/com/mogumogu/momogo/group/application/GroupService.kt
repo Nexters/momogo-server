@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 @Service
 class GroupService(
@@ -52,6 +53,13 @@ class GroupService(
                 startAt = timeRange.startAt,
                 endAt = timeRange.endAt,
             ).associate { count -> count.groupId to count.uploaderCount }
+        val latestUploadAtByGroupId = photoGroupRepository
+            .findLatestUploadsByGroupIdsExcludingUserId(
+                groupIds = groupIds,
+                userId = userId,
+            ).associate { upload ->
+                upload.groupId to LocalDateTime.ofInstant(upload.latestUploadAt, clock.zone)
+            }
 
         return GetJoinedGroupsResult(
             date = timeRange.date,
@@ -65,6 +73,7 @@ class GroupService(
                     groupName = group.name,
                     totalMemberCount = totalMemberCount,
                     todayPhotoUploaderCount = photoUploaderCountByGroupId[groupId] ?: 0L,
+                    latestUploadAt = latestUploadAtByGroupId[groupId],
                 )
             },
         )
@@ -235,6 +244,7 @@ data class JoinedGroupResult(
     val groupName: String,
     val totalMemberCount: Long,
     val todayPhotoUploaderCount: Long,
+    val latestUploadAt: LocalDateTime?,
 )
 
 data class CreateGroupCommand(
