@@ -1,5 +1,6 @@
 package com.mogumogu.momogo.photo.presentation
 
+import com.mogumogu.momogo.APPLICATION_TIME_ZONE_ID
 import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.photo.application.PhotoObjectMetadata
 import com.mogumogu.momogo.photo.application.PhotoObjectMetadataReader
@@ -18,19 +19,24 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.data.auditing.DateTimeProvider
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.convention.TestBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import tools.jackson.databind.ObjectMapper
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
+import java.util.Optional
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -88,17 +94,38 @@ class PhotoApiIntegrationTest(
         )
     }
 
-    fun createGroup(
+    fun createGroupFixture(
         accessToken: String,
         name: String,
-    ): Long {
+    ): PhotoGroupFixture {
         val response = performJson(
             post("/api/v1/groups")
                 .header("Authorization", "Bearer $accessToken"),
             json(mapOf("name" to name)),
         )
         response.status shouldBe HttpStatus.OK.value()
-        return objectMapper.readTree(response.contentAsString)["groupId"].longValue()
+        val body = objectMapper.readTree(response.contentAsString)
+        return PhotoGroupFixture(
+            groupId = body["groupId"].longValue(),
+            inviteCode = body["inviteCode"].stringValue(),
+        )
+    }
+
+    fun createGroup(
+        accessToken: String,
+        name: String,
+    ): Long = createGroupFixture(accessToken, name).groupId
+
+    fun joinGroup(
+        accessToken: String,
+        inviteCode: String,
+    ) {
+        val response = performJson(
+            post("/api/v1/groups/invitations")
+                .header("Authorization", "Bearer $accessToken"),
+            json(mapOf("code" to inviteCode)),
+        )
+        response.status shouldBe HttpStatus.OK.value()
     }
 
     fun createPhotoWithContent(
@@ -126,6 +153,18 @@ class PhotoApiIntegrationTest(
                 ),
             ),
         )
+
+    fun unlinkPhoto(
+        accessToken: String?,
+        groupId: Long,
+        photoId: Long,
+    ): MockHttpServletResponse {
+        val request = delete("/api/v1/groups/{groupId}/photos/{photoId}", groupId, photoId)
+        if (accessToken != null) {
+            request.header("Authorization", "Bearer $accessToken")
+        }
+        return mockMvc.perform(request).andReturn().response
+    }
 
     fun withdraw(accessToken: String): MockHttpServletResponse =
         mockMvc.perform(
@@ -170,6 +209,7 @@ class PhotoApiIntegrationTest(
         val body = objectMapper.readTree(response.contentAsString)
         body["status"].intValue() shouldBe status.value()
         body["detail"].stringValue() shouldBe errorCode.message
+        body["code"].stringValue() shouldBe errorCode.name
     }
 
     given("인증된 사용자가 R2에 올린 사진과 참여 중인 두 그룹을 선택하면") {
@@ -554,10 +594,234 @@ class PhotoApiIntegrationTest(
             }
         }
     }
-})
+
+    given("사용자가 한 사진을 A와 B 그룹에 함께 등록했으면") {
+        `when`("A 그룹에서 사진을 내릴 때") {
+            then("A 연결만 해제하고 A의 오늘 업로드 기회만 다시 사용할 수 있다") {
+                val user = register("photo-unlink-one-group")
+                val firstGroupId = createGroup(user.accessToken, "내리기 A 그룹")
+                val secondGroupId = createGroup(user.accessToken, "내리기 B 그룹")
+                val originalObjectKey = objectKey(user.userId)
+                putObject(originalObjectKey)
+                val createResponse = createPhoto(
+                    accessToken = user.accessToken,
+                    objectKey = originalObjectKey.value,
+                    groupIds = listOf(firstGroupId, secondGroupId),
+                )
+                createResponse.status shouldBe HttpStatus.OK.value()
+                val photoId = objectMapper.readTree(createResponse.contentAsString)["photoId"].longValue()
+                val firstPhotoGroup = requireNotNull(
+                    photoGroupRepository.findActiveByPhotoIdAndGroupId(photoId, firstGroupId),
+                )
+                val firstPhotoGroupId = requireNotNull(firstPhotoGroup.id)
+                val photoCountBefore = photoRepository.count()
+                val photoGroupCountBefore = photoGroupRepository.count()
+                val unlinkedAtEarliest = clock.instant()
+
+                val response = unlinkPhoto(user.accessToken, firstGroupId, photoId)
+
+                val unlinkedAtLatest = clock.instant()
+                response.status shouldBe HttpStatus.OK.value()
+                response.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
+                objectMapper.readTree(response.contentAsString).toString() shouldBe "{}"
+                photoRepository.count() shouldBe photoCountBefore
+                photoGroupRepository.count() shouldBe photoGroupCountBefore
+                photoRepository.findById(photoId).orElseThrow().objectKey shouldBe originalObjectKey.value
+                photoGroupRepository.findActiveByPhotoIdAndGroupId(photoId, firstGroupId) shouldBe null
+                requireNotNull(
+                    photoGroupRepository.findActiveByPhotoIdAndGroupId(photoId, secondGroupId),
+                )
+                val unlinkedAt = photoGroupRepository.findById(firstPhotoGroupId).orElseThrow().deletedAt
+                requireNotNull(unlinkedAt)
+                unlinkedAt.isBefore(unlinkedAtEarliest) shouldBe false
+                unlinkedAt.isAfter(unlinkedAtLatest) shouldBe false
+
+                val firstGroupObjectKey = objectKey(user.userId)
+                putObject(firstGroupObjectKey)
+                createPhoto(
+                    accessToken = user.accessToken,
+                    objectKey = firstGroupObjectKey.value,
+                    groupIds = listOf(firstGroupId),
+                ).status shouldBe HttpStatus.OK.value()
+
+                val secondGroupObjectKey = objectKey(user.userId)
+                putObject(secondGroupObjectKey)
+                assertProblem(
+                    response = createPhoto(
+                        accessToken = user.accessToken,
+                        objectKey = secondGroupObjectKey.value,
+                        groupIds = listOf(secondGroupId),
+                    ),
+                    status = HttpStatus.CONFLICT,
+                    errorCode = ErrorCode.DAILY_GROUP_UPLOAD_LIMIT_EXCEEDED,
+                )
+            }
+        }
+    }
+
+    given("그룹에 다른 사용자가 올린 사진이 있으면") {
+        `when`("그룹 멤버와 비멤버가 각각 사진을 내리려고 할 때") {
+            then("멤버는 FORBIDDEN, 비멤버는 NOT_GROUP_MEMBER 오류를 받는다") {
+                val uploader = register("photo-unlink-owner")
+                val member = register("photo-unlink-member")
+                val nonMember = register("photo-unlink-non-member")
+                val group = createGroupFixture(uploader.accessToken, "소유권 확인 그룹")
+                joinGroup(member.accessToken, group.inviteCode)
+                val uploadedObjectKey = objectKey(uploader.userId)
+                putObject(uploadedObjectKey)
+                val createResponse = createPhoto(
+                    accessToken = uploader.accessToken,
+                    objectKey = uploadedObjectKey.value,
+                    groupIds = listOf(group.groupId),
+                )
+                val photoId = objectMapper.readTree(createResponse.contentAsString)["photoId"].longValue()
+
+                assertProblem(
+                    response = unlinkPhoto(member.accessToken, group.groupId, photoId),
+                    status = HttpStatus.FORBIDDEN,
+                    errorCode = ErrorCode.FORBIDDEN,
+                )
+                assertProblem(
+                    response = unlinkPhoto(nonMember.accessToken, group.groupId, photoId),
+                    status = HttpStatus.FORBIDDEN,
+                    errorCode = ErrorCode.NOT_GROUP_MEMBER,
+                )
+                requireNotNull(
+                    photoGroupRepository.findActiveByPhotoIdAndGroupId(photoId, group.groupId),
+                )
+            }
+        }
+    }
+
+    given("사용자가 두 그룹에 참여하고 한 그룹에만 사진을 올렸으면") {
+        `when`("다른 그룹 경로로 내리거나 같은 사진을 두 번 내릴 때") {
+            then("PHOTO_NOT_FOUND 오류를 반환하고 성공한 요청만 연결을 해제한다") {
+                val user = register("photo-unlink-not-found")
+                val linkedGroupId = createGroup(user.accessToken, "사진 연결 그룹")
+                val otherGroupId = createGroup(user.accessToken, "다른 그룹")
+                val uploadedObjectKey = objectKey(user.userId)
+                putObject(uploadedObjectKey)
+                val createResponse = createPhoto(
+                    accessToken = user.accessToken,
+                    objectKey = uploadedObjectKey.value,
+                    groupIds = listOf(linkedGroupId),
+                )
+                val photoId = objectMapper.readTree(createResponse.contentAsString)["photoId"].longValue()
+
+                assertProblem(
+                    response = unlinkPhoto(user.accessToken, otherGroupId, photoId),
+                    status = HttpStatus.NOT_FOUND,
+                    errorCode = ErrorCode.PHOTO_NOT_FOUND,
+                )
+                requireNotNull(
+                    photoGroupRepository.findActiveByPhotoIdAndGroupId(photoId, linkedGroupId),
+                )
+
+                unlinkPhoto(user.accessToken, linkedGroupId, photoId).status shouldBe HttpStatus.OK.value()
+                assertProblem(
+                    response = unlinkPhoto(user.accessToken, linkedGroupId, photoId),
+                    status = HttpStatus.NOT_FOUND,
+                    errorCode = ErrorCode.PHOTO_NOT_FOUND,
+                )
+            }
+        }
+    }
+
+    given("그룹 또는 사진 ID가 양수가 아니거나 인증 정보가 없으면") {
+        `when`("그룹 사진을 내릴 때") {
+            then("잘못된 ID는 INVALID_REQUEST, 미인증 요청은 401 오류를 반환한다") {
+                val user = register("photo-unlink-invalid-request")
+
+                listOf(
+                    0L to 1L,
+                    -1L to 1L,
+                    1L to 0L,
+                    1L to -1L,
+                ).forEach { (groupId, photoId) ->
+                    assertProblem(
+                        response = unlinkPhoto(user.accessToken, groupId, photoId),
+                        status = HttpStatus.BAD_REQUEST,
+                        errorCode = ErrorCode.INVALID_REQUEST,
+                    )
+                }
+
+                assertProblem(
+                    response = unlinkPhoto(null, 1L, 1L),
+                    status = HttpStatus.UNAUTHORIZED,
+                    errorCode = ErrorCode.INVALID_AUTH_CREDENTIALS,
+                )
+            }
+        }
+    }
+
+    given("같은 그룹 사진을 두 요청이 동시에 내리면") {
+        `when`("두 요청이 함께 처리될 때") {
+            then("한 요청만 연결을 해제하고 다른 요청은 PHOTO_NOT_FOUND를 반환한다") {
+                val user = register("photo-unlink-concurrent")
+                val groupId = createGroup(user.accessToken, "동시 내리기 그룹")
+                val uploadedObjectKey = objectKey(user.userId)
+                putObject(uploadedObjectKey)
+                val createResponse = createPhoto(
+                    accessToken = user.accessToken,
+                    objectKey = uploadedObjectKey.value,
+                    groupIds = listOf(groupId),
+                )
+                val photoId = objectMapper.readTree(createResponse.contentAsString)["photoId"].longValue()
+                val ready = CountDownLatch(2)
+                val start = CountDownLatch(1)
+                val executor = Executors.newFixedThreadPool(2)
+
+                val futures = (1..2).map {
+                    executor.submit<MockHttpServletResponse> {
+                        ready.countDown()
+                        start.await(5, TimeUnit.SECONDS)
+                        unlinkPhoto(user.accessToken, groupId, photoId)
+                    }
+                }
+                ready.await(5, TimeUnit.SECONDS) shouldBe true
+                start.countDown()
+                val responses = futures.map { future -> future.get(10, TimeUnit.SECONDS) }
+                executor.shutdownNow()
+
+                responses.map { response -> response.status }.sorted() shouldBe
+                    listOf(HttpStatus.OK.value(), HttpStatus.NOT_FOUND.value()).sorted()
+                assertProblem(
+                    response = responses.single { response ->
+                        response.status == HttpStatus.NOT_FOUND.value()
+                    },
+                    status = HttpStatus.NOT_FOUND,
+                    errorCode = ErrorCode.PHOTO_NOT_FOUND,
+                )
+                photoGroupRepository.findActiveByPhotoIdAndGroupId(photoId, groupId) shouldBe null
+            }
+        }
+    }
+}) {
+
+    @TestBean(
+        name = "auditingDateTimeProvider",
+        methodName = "fixedAuditingDateTimeProvider",
+        enforceOverride = true,
+    )
+    lateinit var testAuditingDateTimeProvider: DateTimeProvider
+
+    companion object {
+        @JvmStatic
+        fun fixedAuditingDateTimeProvider(): DateTimeProvider =
+            DateTimeProvider { Optional.of(PHOTO_API_TEST_INSTANT) }
+    }
+}
 
 @TestConfiguration(proxyBeanMethods = false)
 class PhotoApiTestConfiguration {
+    @Bean
+    @Primary
+    fun fixedClock(): Clock =
+        Clock.fixed(
+            PHOTO_API_TEST_INSTANT,
+            ZoneId.of(APPLICATION_TIME_ZONE_ID),
+        )
+
     @Bean
     @Primary
     fun stubPhotoObjectMetadataReader(): StubPhotoObjectMetadataReader =
@@ -586,3 +850,10 @@ private data class PhotoRegisteredUserFixture(
     val userId: Long,
     val accessToken: String,
 )
+
+private data class PhotoGroupFixture(
+    val groupId: Long,
+    val inviteCode: String,
+)
+
+private val PHOTO_API_TEST_INSTANT = Instant.parse("2026-08-11T03:00:00Z")

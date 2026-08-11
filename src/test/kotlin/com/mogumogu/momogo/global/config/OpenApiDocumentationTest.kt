@@ -75,6 +75,8 @@ class OpenApiDocumentationTest(
                 document.operation("/api/v1/photos/me", "get")
                     .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/photos", "post").requiresBearerAuth() shouldBe true
+                document.operation("/api/v1/groups/{groupId}/photos/{photoId}", "delete")
+                    .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/groups/{groupId}/photos/{photoId}/reactions", "post")
                     .requiresBearerAuth() shouldBe true
                 document.operation("/api/v1/groups/{groupId}/photos/{photoId}/reactions", "get")
@@ -130,6 +132,10 @@ class OpenApiDocumentationTest(
                 document.operation(
                     "/api/v1/photos",
                     "post",
+                )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
+                document.operation(
+                    "/api/v1/groups/{groupId}/photos/{photoId}",
+                    "delete",
                 )["responses"]["401"]["\$ref"].stringValue() shouldBe commonResponseRef
                 document.operation(
                     "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
@@ -196,6 +202,24 @@ class OpenApiDocumentationTest(
                 }["required"].booleanValue() shouldBe false
                 document.operation("/api/v1/photos", "post")
                     .hasParameter("userId") shouldBe false
+                val unlinkPhoto = document.operation(
+                    "/api/v1/groups/{groupId}/photos/{photoId}",
+                    "delete",
+                )
+                unlinkPhoto.hasParameter("userId") shouldBe false
+                unlinkPhoto.hasParameter("groupId") shouldBe true
+                unlinkPhoto.hasParameter("photoId") shouldBe true
+                unlinkPhoto.has("requestBody") shouldBe false
+                val unlinkGroupId = unlinkPhoto.parameter("groupId")
+                unlinkGroupId["required"].booleanValue() shouldBe true
+                unlinkGroupId["description"].stringValue() shouldBe "사진을 내릴 그룹 ID"
+                unlinkGroupId["schema"]["type"].stringValue() shouldBe "integer"
+                unlinkGroupId["schema"]["minimum"].intValue() shouldBe 1
+                val unlinkPhotoId = unlinkPhoto.parameter("photoId")
+                unlinkPhotoId["required"].booleanValue() shouldBe true
+                unlinkPhotoId["description"].stringValue() shouldBe "그룹에서 내릴 사진 ID"
+                unlinkPhotoId["schema"]["type"].stringValue() shouldBe "integer"
+                unlinkPhotoId["schema"]["minimum"].intValue() shouldBe 1
                 val reportPhoto = document.operation(
                     "/api/v1/groups/{groupId}/photos/{photoId}/reports",
                     "post",
@@ -226,6 +250,10 @@ class OpenApiDocumentationTest(
                 val issuePhotoUploadUrl = document.operation("/api/v1/photos/upload-urls", "post")
                 val getMyPhotos = document.operation("/api/v1/photos/me", "get")
                 val createPhoto = document.operation("/api/v1/photos", "post")
+                val unlinkPhoto = document.operation(
+                    "/api/v1/groups/{groupId}/photos/{photoId}",
+                    "delete",
+                )
                 val createPhotoReaction = document.operation(
                     "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
                     "post",
@@ -306,6 +334,14 @@ class OpenApiDocumentationTest(
                 createPhoto.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 createPhoto.hasResponseMediaType("409", "application/problem+json") shouldBe true
                 createPhoto.hasResponseMediaType("422", "application/problem+json") shouldBe true
+                unlinkPhoto["summary"].stringValue() shouldBe "그룹에서 사진 내리기"
+                unlinkPhoto.responseCodes() shouldBe setOf("200", "400", "401", "403", "404")
+                unlinkPhoto.hasResponseMediaType("200", "application/json") shouldBe true
+                unlinkPhoto.hasResponseMediaType("400", "application/problem+json") shouldBe true
+                unlinkPhoto.hasResponseMediaType("403", "application/problem+json") shouldBe true
+                unlinkPhoto.hasResponseMediaType("404", "application/problem+json") shouldBe true
+                unlinkPhoto.parameter("groupId")["example"].intValue() shouldBe 10
+                unlinkPhoto.parameter("photoId")["example"].intValue() shouldBe 501
                 val getPhotoReactions = document.operation(
                     "/api/v1/groups/{groupId}/photos/{photoId}/reactions",
                     "get",
@@ -788,6 +824,12 @@ private val operationExampleExpectations = listOf(
         successSchema = "PhotoCreateResponse",
     ),
     OperationExampleExpectation(
+        path = "/api/v1/groups/{groupId}/photos/{photoId}",
+        method = "delete",
+        success = OpenApiExample.EMPTY_OBJECT_RESPONSE,
+        successSchema = null,
+    ),
+    OperationExampleExpectation(
         path = "/init/versions",
         method = "get",
         success = OpenApiExample.APP_VERSION_RESPONSE,
@@ -1031,6 +1073,24 @@ private val errorResponseExpectations = listOf(
         "post",
         "422",
         setOf(ErrorCode.OBJECT_NOT_UPLOADED),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}",
+        "delete",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}",
+        "delete",
+        "403",
+        setOf(ErrorCode.NOT_GROUP_MEMBER, ErrorCode.FORBIDDEN),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/{groupId}/photos/{photoId}",
+        "delete",
+        "404",
+        setOf(ErrorCode.PHOTO_NOT_FOUND),
     ),
     ErrorResponseExpectation(
         "/init/versions",
