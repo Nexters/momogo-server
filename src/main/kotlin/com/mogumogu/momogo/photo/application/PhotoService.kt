@@ -82,6 +82,27 @@ class PhotoService(
         )
     }
 
+    @Transactional
+    fun unlink(command: UnlinkPhotoCommand) {
+        if (command.groupId <= 0 || command.photoId <= 0) {
+            throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
+        }
+
+        findJoinedGroupsForUpdate(
+            userId = command.userId,
+            groupIds = listOf(command.groupId),
+        )
+        val photoGroup = photoGroupRepository.findActiveByPhotoIdAndGroupId(
+            photoId = command.photoId,
+            groupId = command.groupId,
+        ) ?: throw ApiException.NotFound(ErrorCode.PHOTO_NOT_FOUND)
+        if (photoGroup.photo.uploader?.id != command.userId) {
+            throw ApiException.Forbidden(ErrorCode.FORBIDDEN)
+        }
+
+        photoGroup.unlink(clock.instant())
+    }
+
     private fun normalizeGroupIds(groupIds: List<Long>): List<Long> {
         if (
             groupIds.isEmpty() ||
@@ -156,4 +177,10 @@ data class CreatePhotoResult(
     val photoId: Long,
     val objectKey: String,
     val createdAt: LocalDateTime,
+)
+
+data class UnlinkPhotoCommand(
+    val userId: Long,
+    val groupId: Long,
+    val photoId: Long,
 )
