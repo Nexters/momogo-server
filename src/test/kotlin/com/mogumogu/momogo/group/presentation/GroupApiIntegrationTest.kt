@@ -176,10 +176,12 @@ class GroupApiIntegrationTest(
 
     fun invitationInfo(
         accessToken: String?,
-        code: String,
+        code: String?,
     ): MockHttpServletResponse {
         val request = get("/api/v1/groups/invitations")
-            .queryParam("code", code)
+        if (code != null) {
+            request.queryParam("code", code)
+        }
         if (accessToken != null) {
             request.header("Authorization", "Bearer $accessToken")
         }
@@ -1101,6 +1103,27 @@ class GroupApiIntegrationTest(
                     }
                 }
                 groupMemberRepository.count() shouldBe 0L
+            }
+        }
+    }
+
+    given("초대 코드 쿼리 파라미터가 없으면") {
+        `when`("인증된 사용자가 그룹 정보를 조회할 때") {
+            then("Spring 내부 메시지를 숨긴 INVALID_REQUEST ProblemDetail을 반환한다") {
+                cleanDatabase()
+                val registeredUser = registerUser("missing-invitation-code")
+                val response = invitationInfo(
+                    accessToken = registeredUser.accessToken,
+                    code = null,
+                )
+
+                assertProblem(
+                    response = response,
+                    status = HttpStatus.BAD_REQUEST,
+                    errorCode = ErrorCode.INVALID_REQUEST,
+                )
+                objectMapper.readTree(response.contentAsString)["instance"].stringValue() shouldBe
+                    "/api/v1/groups/invitations"
             }
         }
     }

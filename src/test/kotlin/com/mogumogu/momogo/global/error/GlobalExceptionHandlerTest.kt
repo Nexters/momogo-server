@@ -173,6 +173,22 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
                 body["code"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.name
             }
         }
+
+        `when`("필수 쿼리 파라미터가 누락됐을 때") {
+            val response = mockMvc.perform(get("/test/required-parameter"))
+                .andReturn()
+                .response
+            val body = objectMapper.readTree(response.contentAsString)
+
+            then("Spring 내부 메시지를 숨긴 INVALID_REQUEST ProblemDetail로 응답한다") {
+                response.status shouldBe 400
+                response.contentType shouldBe MediaType.APPLICATION_PROBLEM_JSON_VALUE
+                body["status"].intValue() shouldBe 400
+                body["detail"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.message
+                body["instance"].stringValue() shouldBe "/test/required-parameter"
+                body["code"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.name
+            }
+        }
     }
 
     given("DB 무결성 위반이 발생하면") {
@@ -237,6 +253,12 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
             @Positive
             number: Long,
         ) = number
+
+        @GetMapping("/required-parameter")
+        fun requiredParameter(
+            @RequestParam
+            value: String,
+        ) = value
 
         @GetMapping("/other-data-integrity")
         fun otherDataIntegrity(): Nothing =

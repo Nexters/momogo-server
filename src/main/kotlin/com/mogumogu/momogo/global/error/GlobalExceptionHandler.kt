@@ -6,6 +6,7 @@ import org.springframework.beans.TypeMismatchException
 import org.springframework.http.*
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.WebRequest
@@ -16,6 +17,23 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
 
     private val log = LoggerFactory.getLogger(javaClass)
+
+    override fun handleMissingServletRequestParameter(
+        ex: MissingServletRequestParameterException,
+        headers: HttpHeaders,
+        status: HttpStatusCode,
+        request: WebRequest,
+    ): ResponseEntity<Any>? =
+        handleExceptionInternal(
+            ex,
+            createProblemDetail(
+                status = HttpStatus.BAD_REQUEST,
+                errorCode = ErrorCode.INVALID_REQUEST,
+            ),
+            headers,
+            HttpStatus.BAD_REQUEST,
+            request,
+        )
 
     override fun handleMethodArgumentNotValid(
         ex: MethodArgumentNotValidException,
@@ -31,7 +49,7 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         problemDetail.setProperty(
             "errors",
             ex.bindingResult.fieldErrors.map { fieldError ->
-                FieldValidationError(
+                ApiValidationError(
                     field = fieldError.field,
                     message = fieldError.defaultMessage ?: "올바르지 않은 값입니다.",
                 )
@@ -125,9 +143,4 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
             exception.javaClass.name,
         )
     }
-
-    private data class FieldValidationError(
-        val field: String,
-        val message: String,
-    )
 }

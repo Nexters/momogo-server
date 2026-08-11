@@ -115,4 +115,23 @@ class AppVersionApiIntegrationTest(
             }
         }
     }
+
+    given("필수 앱 버전 쿼리 파라미터가 없으면") {
+        `when`("플랫폼만 전달해 버전 체크를 요청할 때") {
+            val response = mockMvc.perform(
+                get("/init/versions")
+                    .queryParam("platform", "IOS"),
+            ).andReturn().response
+            val body = objectMapper.readTree(response.contentAsString)
+
+            then("Spring 내부 메시지를 숨긴 INVALID_REQUEST ProblemDetail을 반환한다") {
+                response.status shouldBe HttpStatus.BAD_REQUEST.value()
+                response.contentType shouldBe MediaType.APPLICATION_PROBLEM_JSON_VALUE
+                body["status"].intValue() shouldBe HttpStatus.BAD_REQUEST.value()
+                body["detail"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.message
+                body["instance"].stringValue() shouldBe "/init/versions"
+                body["code"].stringValue() shouldBe ErrorCode.INVALID_REQUEST.name
+            }
+        }
+    }
 })
