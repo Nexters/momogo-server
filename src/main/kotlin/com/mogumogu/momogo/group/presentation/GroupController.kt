@@ -231,7 +231,10 @@ class GroupController(
         description = "그룹에 참여하기 전에 초대 코드에 해당하는 그룹 정보와 현재 참여 여부를 확인합니다.",
     )
     @ApiExamples(success = OpenApiExample.GROUP_INVITATION_RESPONSE)
-    @ApiErrors(notFound = [ErrorCode.INVALID_INVITATION_CODE])
+    @ApiErrors(
+        badRequest = [ErrorCode.INVALID_REQUEST],
+        notFound = [ErrorCode.INVALID_INVITATION_CODE],
+    )
     @GetMapping("/invitations")
     fun getInvitation(
         @RequestUserId

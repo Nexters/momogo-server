@@ -1,5 +1,6 @@
 package com.mogumogu.momogo.global.config
 
+import com.mogumogu.momogo.global.error.ApiProblemDetail
 import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.global.openapi.ApiErrors
 import com.mogumogu.momogo.global.openapi.ApiExamples
@@ -25,7 +26,6 @@ import org.springframework.core.annotation.AnnotatedElementUtils
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType.APPLICATION_JSON_VALUE
 import org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON_VALUE
-import org.springframework.http.ProblemDetail
 import org.springdoc.core.customizers.OpenApiCustomizer
 
 @Configuration(proxyBeanMethods = false)
@@ -112,7 +112,7 @@ class OpenApiConfiguration(
             )
             .apply {
                 ModelConverters.getInstance()
-                    .read(ProblemDetail::class.java)
+                    .readAll(ApiProblemDetail::class.java)
                     .forEach { (name, schema) -> addSchemas(name, schema) }
 
                 OpenApiExample.entries
@@ -224,10 +224,10 @@ class OpenApiConfiguration(
 
     private fun ErrorCode.problemDetailExample(status: HttpStatus): Map<String, Any> =
         mapOf(
-            "type" to "about:blank",
             "title" to status.reasonPhrase,
             "status" to status.value(),
             "detail" to message,
+            "instance" to "/requested/path",
             "code" to name,
         )
 
@@ -235,6 +235,6 @@ class OpenApiConfiguration(
         const val BEARER_AUTH = "bearerAuth"
         const val BEARER_UNAUTHORIZED_RESPONSE = "BearerUnauthorized"
         private const val SUCCESS_RESPONSE_CODE = "200"
-        private const val PROBLEM_DETAIL_SCHEMA_REF = "#/components/schemas/ProblemDetail"
+        private const val PROBLEM_DETAIL_SCHEMA_REF = "#/components/schemas/ApiProblemDetail"
     }
 }

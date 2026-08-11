@@ -156,7 +156,7 @@ class OpenApiDocumentationTest(
                 commonResponse["content"].has("application/problem+json") shouldBe true
                 val unauthorizedContent = commonResponse["content"]["application/problem+json"]
                 unauthorizedContent["schema"]["\$ref"].stringValue() shouldBe
-                    "#/components/schemas/ProblemDetail"
+                    "#/components/schemas/ApiProblemDetail"
                 unauthorizedContent["examples"].propertyNames().asSequence().toSet() shouldBe
                     setOf(ErrorCode.INVALID_AUTH_CREDENTIALS.name)
                 unauthorizedContent["examples"][ErrorCode.INVALID_AUTH_CREDENTIALS.name]
@@ -276,8 +276,9 @@ class OpenApiDocumentationTest(
                 updateGroupName.hasResponseMediaType("400", "application/problem+json") shouldBe true
                 updateGroupName.hasResponseMediaType("403", "application/problem+json") shouldBe true
                 updateGroupName.hasResponseMediaType("404", "application/problem+json") shouldBe true
-                invitationInfo.responseCodes() shouldBe setOf("200", "401", "404")
+                invitationInfo.responseCodes() shouldBe setOf("200", "400", "401", "404")
                 invitationInfo.hasResponseMediaType("200", "application/json") shouldBe true
+                invitationInfo.hasResponseMediaType("400", "application/problem+json") shouldBe true
                 invitationInfo.hasResponseMediaType("404", "application/problem+json") shouldBe true
                 joinGroup.responseCodes() shouldBe setOf("200", "401", "404", "409")
                 joinGroup.hasResponseMediaType("200", "application/json") shouldBe true
@@ -394,7 +395,38 @@ class OpenApiDocumentationTest(
             }
 
             then("실제 발생 가능한 오류를 상태별 named example로 제공한다") {
-                document["components"]["schemas"].has("ProblemDetail") shouldBe true
+                val schemas = document["components"]["schemas"]
+                schemas.has("ApiProblemDetail") shouldBe true
+                schemas.has("ApiValidationError") shouldBe true
+
+                val apiProblemDetail = schemas["ApiProblemDetail"]
+                apiProblemDetail["required"].stringValues().toSet() shouldBe setOf(
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "code",
+                )
+                apiProblemDetail["properties"].propertyNames().asSequence().toSet() shouldBe setOf(
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "code",
+                    "errors",
+                )
+                apiProblemDetail["properties"]["code"]["enum"].stringValues().toSet() shouldBe
+                    ErrorCode.entries.map { errorCode -> errorCode.name }.toSet()
+                apiProblemDetail["properties"]["code"]["type"].stringValue() shouldBe "string"
+                apiProblemDetail["properties"]["errors"]["items"]["\$ref"].stringValue() shouldBe
+                    "#/components/schemas/ApiValidationError"
+
+                val validationError = schemas["ApiValidationError"]
+                validationError["required"].stringValues().toSet() shouldBe
+                    setOf("field", "message")
+                validationError["properties"].propertyNames().asSequence().toSet() shouldBe
+                    setOf("field", "message")
 
                 errorResponseExpectations.forEach { expectation ->
                     val operation = document.operation(expectation.path, expectation.method)
@@ -403,7 +435,7 @@ class OpenApiDocumentationTest(
                             .get("application/problem+json")
 
                     content["schema"]["\$ref"].stringValue() shouldBe
-                        "#/components/schemas/ProblemDetail"
+                        "#/components/schemas/ApiProblemDetail"
                     content["examples"].propertyNames().asSequence().toSet() shouldBe
                         expectation.errors.map { errorCode -> errorCode.name }.toSet()
 
@@ -922,6 +954,12 @@ private val errorResponseExpectations = listOf(
     ErrorResponseExpectation(
         "/api/v1/groups/invitations",
         "get",
+        "400",
+        setOf(ErrorCode.INVALID_REQUEST),
+    ),
+    ErrorResponseExpectation(
+        "/api/v1/groups/invitations",
+        "get",
         "404",
         setOf(ErrorCode.INVALID_INVITATION_CODE),
     ),
@@ -1137,9 +1175,11 @@ private fun JsonNode.shouldBeProblemExample(
     status: HttpStatus,
 ) {
     this["summary"].stringValue() shouldBe errorCode.message
-    this["value"]["type"].stringValue() shouldBe "about:blank"
+    this["value"].propertyNames().asSequence().toSet() shouldBe
+        setOf("title", "status", "detail", "instance", "code")
     this["value"]["title"].stringValue() shouldBe status.reasonPhrase
     this["value"]["status"].intValue() shouldBe status.value()
     this["value"]["detail"].stringValue() shouldBe errorCode.message
+    this["value"]["instance"].stringValue() shouldBe "/requested/path"
     this["value"]["code"].stringValue() shouldBe errorCode.name
 }
