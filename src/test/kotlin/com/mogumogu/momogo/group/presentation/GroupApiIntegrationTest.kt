@@ -334,7 +334,7 @@ class GroupApiIntegrationTest(
 
     given("현재 사용자가 참여 중인 그룹과 오늘 등록된 그룹 사진이 있으면") {
         `when`("내가 참여한 그룹을 조회할 때") {
-            then("활성 그룹별 현재 멤버 수와 오늘 사진을 올린 멤버 수를 반환한다") {
+            then("활성 그룹별 현재 멤버 수와 현재 멤버의 사진 활동을 반환한다") {
                 cleanDatabase()
                 val requestingUser = registerUser("joined-group-list-requester")
                 val withdrawnUploader = registerUser("joined-group-list-withdrawn-uploader")
@@ -456,7 +456,7 @@ class GroupApiIntegrationTest(
                     group["totalMemberCount"].longValue() shouldBe 5L
                     group["todayPhotoUploaderCount"].longValue() shouldBe 3L
                     LocalDateTime.parse(group["latestUploadAt"].stringValue()) shouldBe
-                        LocalDateTime.ofInstant(anonymousUploadAt, clock.zone)
+                        LocalDateTime.ofInstant(todayAtNoon, clock.zone)
                 }
                 groupsById.getValue(requireNotNull(groupWithoutPhotos.id)).let { group ->
                     group["groupName"].stringValue() shouldBe "오늘 사진이 없는 그룹"

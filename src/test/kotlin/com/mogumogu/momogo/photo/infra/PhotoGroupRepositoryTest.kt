@@ -154,7 +154,7 @@ class PhotoGroupRepositoryTest(
 
     given("여러 그룹에 본인과 다른 사용자의 사진이 있으면") {
         `when`("그룹별 다른 사용자의 최신 활성 업로드를 조회할 때") {
-            then("현재 멤버 여부와 익명화 여부에 관계없이 단일 SQL로 최신 시각을 집계한다") {
+            then("현재 활성 멤버의 사진만 단일 SQL로 최신 시각을 집계한다") {
                 val requestingUser = User(_nickname = "조회자")
                 val otherUploader = User(_nickname = "다른 업로더")
                 val formerUploader = User(_nickname = "과거 멤버")
@@ -289,14 +289,10 @@ class PhotoGroupRepositoryTest(
 
                 latestUploadsByGroupId.keys shouldBe setOf(
                     requireNotNull(groupWithAnonymousUpload.id),
-                    requireNotNull(groupWithFormerMemberUpload.id),
                 )
                 latestUploadsByGroupId
                     .getValue(requireNotNull(groupWithAnonymousUpload.id))
-                    .latestUploadAt shouldBe uploadTimes.getValue(latestAnonymousUpload)
-                latestUploadsByGroupId
-                    .getValue(requireNotNull(groupWithFormerMemberUpload.id))
-                    .latestUploadAt shouldBe uploadTimes.getValue(formerMemberUpload)
+                    .latestUploadAt shouldBe uploadTimes.getValue(olderOtherUpload)
                 statistics.prepareStatementCount shouldBe 1L
                 statistics.entityFetchCount shouldBe 0L
             }

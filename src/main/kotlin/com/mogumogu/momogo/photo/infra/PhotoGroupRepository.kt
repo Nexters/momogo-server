@@ -99,10 +99,17 @@ interface PhotoGroupRepository : JpaRepository<PhotoGroup, Long> {
         )
         FROM PhotoGroup pg
         JOIN pg._photo photo
-        LEFT JOIN photo._uploader uploader
+        JOIN photo._uploader uploader
         WHERE pg._group._id IN :groupIds
           AND pg._deletedAt IS NULL
-          AND (uploader._id IS NULL OR uploader._id <> :userId)
+          AND uploader._id <> :userId
+          AND EXISTS (
+              SELECT member._id
+              FROM GroupMember member
+              WHERE member._group = pg._group
+                AND member._user = uploader
+                AND member._deletedAt IS NULL
+          )
         GROUP BY pg._group._id
         """,
     )
