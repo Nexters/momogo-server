@@ -35,7 +35,7 @@ class DiscordServiceEventNotifier(
         try {
             discordWebhookClient.send(event.toDiscordPayload())
         } catch (exception: DiscordWebhookException) {
-            // 알림 실패로 사용자 요청까지 실패하지 않도록 삼킨다. Webhook URL 노출을 막기 위해 원본 예외는 남기지 않는다.
+            // 알림 실패로 사용자 요청까지 실패하지 않도록 삼킨다.
             log.warn(
                 "Discord 서비스 이벤트 알림 전송에 실패했습니다. type={} reason={}",
                 event.type,

@@ -34,12 +34,10 @@ interface DiscordWebhookClient {
     )
 }
 
-// wait=true로 Discord가 메시지를 저장했는지 확인하고, 실패는 재시도 없이 DiscordWebhookException으로 알린다.
 fun DiscordWebhookClient.send(payload: DiscordWebhookPayload) {
     try {
         postMessage(wait = true, payload = payload)
     } catch (exception: RestClientException) {
-        // Webhook URL은 인증정보이므로 원본 예외의 메시지나 cause를 전달하지 않고 예외 타입만 남긴다.
         throw DiscordWebhookException(exception.javaClass.simpleName)
     }
 }
