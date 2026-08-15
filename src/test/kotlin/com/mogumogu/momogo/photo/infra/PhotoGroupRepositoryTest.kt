@@ -70,11 +70,12 @@ class PhotoGroupRepositoryTest(
                 entityManager.clear()
 
                 statistics.clear()
-                photoGroupRepository.countPhotoUploadersByGroupIdsAndCreatedAtRange(
+                photoGroupRepository.findPhotoActivitiesByGroupIdsAndCreatedAtRange(
                     groupIds = listOf(groupId),
+                    userId = firstUserId,
                     startAt = startAt,
                     endAt = endAt,
-                ) shouldBe listOf(TodayPhotoUploaderCount(groupId, 2L))
+                ) shouldBe listOf(GroupPhotoActivity(groupId, 2L, 1L))
                 statistics.prepareStatementCount shouldBe 1L
                 statistics.entityFetchCount shouldBe 0L
 
@@ -143,11 +144,12 @@ class PhotoGroupRepositoryTest(
                     startAt = startAt,
                     endAt = endAt,
                 ) shouldBe true
-                photoGroupRepository.countPhotoUploadersByGroupIdsAndCreatedAtRange(
+                photoGroupRepository.findPhotoActivitiesByGroupIdsAndCreatedAtRange(
                     groupIds = listOf(unlinkedGroupId, linkedGroupId),
+                    userId = userId,
                     startAt = startAt,
                     endAt = endAt,
-                ) shouldBe listOf(TodayPhotoUploaderCount(linkedGroupId, 1L))
+                ) shouldBe listOf(GroupPhotoActivity(linkedGroupId, 1L, 1L))
             }
         }
     }
