@@ -72,6 +72,13 @@ class GroupController(
                     totalMemberCount = group.totalMemberCount,
                     todayPhotoUploaderCount = group.todayPhotoUploaderCount,
                     latestUploadAt = group.latestUploadAt,
+                    members = group.members.map { member ->
+                        JoinedGroupMemberResponse(
+                            userId = member.userId,
+                            nickname = member.nickname,
+                            mine = member.mine,
+                        )
+                    },
                 )
             },
         )
@@ -396,6 +403,36 @@ data class JoinedGroupResponse(
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val latestUploadAt: LocalDateTime?,
+
+    @field:Schema(
+        description = "현재 그룹원 목록. 요청 사용자가 먼저이며 나머지는 닉네임순",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val members: List<JoinedGroupMemberResponse>,
+)
+
+@Schema(description = "참여 중인 그룹의 그룹원")
+data class JoinedGroupMemberResponse(
+    @field:Schema(
+        description = "그룹원 사용자 ID",
+        example = "1",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val userId: Long,
+
+    @field:Schema(
+        description = "그룹원 닉네임",
+        example = "모모",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val nickname: String,
+
+    @field:Schema(
+        description = "현재 사용자인지 여부",
+        example = "true",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val mine: Boolean,
 )
 
 @Schema(description = "날짜별 그룹 사진 조회 응답")

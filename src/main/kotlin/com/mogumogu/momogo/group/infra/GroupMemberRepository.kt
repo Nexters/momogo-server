@@ -107,21 +107,23 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
     @Query(
         """
         SELECT new com.mogumogu.momogo.group.infra.JoinedGroupMemberView(
+            member._group._id,
             member._user._id,
             member._user._nickname
         )
         FROM GroupMember member
-        WHERE member._group._id = :groupId
+        WHERE member._group._id IN :groupIds
           AND member._deletedAt IS NULL
         ORDER BY
+            member._group._id,
             CASE WHEN member._user._id = :requestUserId THEN 0 ELSE 1 END,
             member._user._nickname,
             member._user._id
         """,
     )
-    fun findJoinedMemberViewsByGroupId(
-        @Param("groupId")
-        groupId: Long,
+    fun findJoinedMemberViewsByGroupIds(
+        @Param("groupIds")
+        groupIds: List<Long>,
         @Param("requestUserId")
         requestUserId: Long,
     ): List<JoinedGroupMemberView>
@@ -139,23 +141,6 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         groupId: Long,
     ): Long
 
-    @Query(
-        """
-        SELECT new com.mogumogu.momogo.group.infra.GroupMemberCount(
-            gm._group._id,
-            COUNT(gm)
-        )
-        FROM GroupMember gm
-        WHERE gm._group._id IN :groupIds
-          AND gm._deletedAt IS NULL
-        GROUP BY gm._group._id
-        """,
-    )
-    fun countJoinedByGroupIds(
-        @Param("groupIds")
-        groupIds: List<Long>,
-    ): List<GroupMemberCount>
-
     @Modifying(flushAutomatically = true)
     @Query(
         """
@@ -169,12 +154,8 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
     ): Int
 }
 
-data class GroupMemberCount(
-    val groupId: Long,
-    val totalMemberCount: Long,
-)
-
 data class JoinedGroupMemberView(
+    val groupId: Long,
     val userId: Long,
     val nickname: String,
 )

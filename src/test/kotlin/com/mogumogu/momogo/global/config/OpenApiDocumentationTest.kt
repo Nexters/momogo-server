@@ -530,6 +530,7 @@ class OpenApiDocumentationTest(
                     "totalMemberCount",
                     "todayPhotoUploaderCount",
                     "latestUploadAt",
+                    "members",
                 )
                 joinedGroupSchema["properties"].propertyNames().asSequence().toSet() shouldBe setOf(
                     "groupId",
@@ -538,7 +539,13 @@ class OpenApiDocumentationTest(
                     "totalMemberCount",
                     "todayPhotoUploaderCount",
                     "latestUploadAt",
+                    "members",
                 )
+                joinedGroupSchema["properties"]["members"]["type"].stringValue() shouldBe "array"
+                schemas["JoinedGroupMemberResponse"]["required"].stringValues().toSet() shouldBe
+                    setOf("userId", "nickname", "mine")
+                schemas["JoinedGroupMemberResponse"]["properties"].propertyNames().asSequence().toSet() shouldBe
+                    setOf("userId", "nickname", "mine")
                 joinedGroupSchema["properties"]["latestUploadAt"]["type"]
                     .stringValues().toSet() shouldBe setOf("string", "null")
                 joinedGroupSchema["properties"]["latestUploadAt"]["format"].stringValue() shouldBe

@@ -451,6 +451,7 @@ class GroupApiIntegrationTest(
                         "totalMemberCount",
                         "todayPhotoUploaderCount",
                         "latestUploadAt",
+                        "members",
                     )
                     group["groupName"].stringValue() shouldBe "오늘 사진이 있는 그룹"
                     LocalDateTime.parse(group["createdAt"].stringValue()) shouldBe
@@ -459,12 +460,37 @@ class GroupApiIntegrationTest(
                     group["todayPhotoUploaderCount"].longValue() shouldBe 3L
                     LocalDateTime.parse(group["latestUploadAt"].stringValue()) shouldBe
                         LocalDateTime.ofInstant(todayAtNoon, clock.zone)
+
+                    val members = group["members"]
+                    val memberNodes = (0 until members.size()).map { index -> members[index] }
+                    memberNodes.forEach { member ->
+                        member.propertyNames().toSet() shouldBe setOf("userId", "nickname", "mine")
+                    }
+                    memberNodes.map { member -> member["userId"].longValue() } shouldBe listOf(
+                        requireNotNull(requestingUser.user.id),
+                        requireNotNull(secondUploader.id),
+                        requireNotNull(previousDayUploader.id),
+                        requireNotNull(unlinkedUploader.id),
+                        requireNotNull(firstUploader.id),
+                    )
+                    memberNodes.map { member -> member["nickname"].stringValue() } shouldBe listOf(
+                        requestingUser.user.nickname,
+                        "둘 업로더",
+                        "어제업로더",
+                        "연결업로더",
+                        "첫 업로더",
+                    )
+                    memberNodes.map { member -> member["mine"].booleanValue() } shouldBe
+                        listOf(true, false, false, false, false)
                 }
                 groupsById.getValue(requireNotNull(groupWithoutPhotos.id)).let { group ->
                     group["groupName"].stringValue() shouldBe "오늘 사진이 없는 그룹"
                     group["totalMemberCount"].longValue() shouldBe 1L
                     group["todayPhotoUploaderCount"].longValue() shouldBe 0L
                     group["latestUploadAt"].isNull shouldBe true
+                    group["members"].size() shouldBe 1
+                    group["members"][0]["userId"].longValue() shouldBe
+                        requireNotNull(requestingUser.user.id)
                 }
             }
         }
