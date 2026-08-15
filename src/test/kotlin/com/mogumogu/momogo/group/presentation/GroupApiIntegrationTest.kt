@@ -591,9 +591,10 @@ class GroupApiIntegrationTest(
                 response.contentType shouldBe MediaType.APPLICATION_JSON_VALUE
                 val body = objectMapper.readTree(response.contentAsString)
                 body.propertyNames().toSet() shouldBe
-                    setOf("groupId", "groupName", "createdAt", "date", "members")
+                    setOf("groupId", "groupName", "inviteCode", "createdAt", "date", "members")
                 body["groupId"].longValue() shouldBe requireNotNull(group.id)
                 body["groupName"].stringValue() shouldBe "상세 조회 그룹"
+                body["inviteCode"].stringValue() shouldBe "DETAIL"
                 LocalDateTime.parse(body["createdAt"].stringValue()) shouldBe
                     LocalDateTime.ofInstant(group.createdAt, clock.zone)
                 body["date"].stringValue() shouldBe date.toString()

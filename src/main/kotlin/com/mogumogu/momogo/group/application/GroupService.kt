@@ -135,6 +135,7 @@ class GroupService(
         return GetGroupResult(
             groupId = groupId,
             groupName = group.name,
+            inviteCode = group.inviteCode.value,
             createdAt = LocalDateTime.ofInstant(group.createdAt, clock.zone),
             date = timeRange.date,
             members = members.map { member ->
@@ -359,6 +360,7 @@ data class JoinedGroupMemberResult(
 data class GetGroupResult(
     val groupId: Long,
     val groupName: String,
+    val inviteCode: String,
     val createdAt: LocalDateTime,
     val date: LocalDate,
     val members: List<GroupMemberResult>,

@@ -86,7 +86,7 @@ class GroupController(
 
     @Operation(
         summary = "날짜별 그룹 사진 조회",
-        description = "현재 그룹원과 지정한 날짜(Asia/Seoul)에 각 그룹원이 올린 활성 사진을 조회합니다. " +
+        description = "그룹 초대 코드, 현재 그룹원과 지정한 날짜(Asia/Seoul)에 각 그룹원이 올린 활성 사진을 조회합니다. " +
             "날짜를 생략하면 오늘을 조회하며, 사진이 없는 그룹원도 photo가 null인 상태로 반환합니다.",
     )
     @ApiExamples(success = OpenApiExample.GROUP_DETAIL_RESPONSE)
@@ -128,6 +128,7 @@ class GroupController(
         return GroupDetailResponse(
             groupId = result.groupId,
             groupName = result.groupName,
+            inviteCode = result.inviteCode,
             createdAt = result.createdAt,
             date = result.date,
             members = result.members.map { member ->
@@ -450,6 +451,14 @@ data class GroupDetailResponse(
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val groupName: String,
+
+    @field:Schema(
+        description = "그룹 초대 코드",
+        example = "A1B2C3",
+        pattern = "^[A-Z0-9]{6}$",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val inviteCode: String,
 
     @field:Schema(
         description = "그룹 생성 시각(Asia/Seoul)",
