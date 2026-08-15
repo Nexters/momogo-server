@@ -160,6 +160,7 @@ enum class OpenApiExample(
         value = mapOf(
             "groupId" to 10,
             "groupName" to "우리 가족",
+            "inviteCode" to "A1B2C3",
             "createdAt" to "2026-08-01T09:00:00.123456",
             "date" to "2026-08-05",
             "members" to listOf(

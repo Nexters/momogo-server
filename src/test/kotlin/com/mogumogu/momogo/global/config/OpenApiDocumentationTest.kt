@@ -549,9 +549,9 @@ class OpenApiDocumentationTest(
                 val getGroup = document.operation("/api/v1/groups/{groupId}", "get")
                 val groupDetailSchema = document.responseSchema(getGroup, "200")
                 groupDetailSchema["required"].stringValues().toSet() shouldBe
-                    setOf("groupId", "groupName", "createdAt", "date", "members")
+                    setOf("groupId", "groupName", "inviteCode", "createdAt", "date", "members")
                 groupDetailSchema["properties"].propertyNames().asSequence().toSet() shouldBe
-                    setOf("groupId", "groupName", "createdAt", "date", "members")
+                    setOf("groupId", "groupName", "inviteCode", "createdAt", "date", "members")
                 groupDetailSchema["properties"]["createdAt"]["format"].stringValue() shouldBe
                     "date-time"
                 groupDetailSchema["properties"]["date"]["format"].stringValue() shouldBe "date"
