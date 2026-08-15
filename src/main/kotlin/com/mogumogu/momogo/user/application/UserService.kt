@@ -1,5 +1,7 @@
 package com.mogumogu.momogo.user.application
 
+import com.mogumogu.momogo.event.domain.ServiceEvent
+import com.mogumogu.momogo.event.domain.ServiceEventType
 import com.mogumogu.momogo.global.error.ApiException
 import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.group.infra.GroupMemberRepository
@@ -10,6 +12,7 @@ import com.mogumogu.momogo.user.domain.User
 import com.mogumogu.momogo.user.infra.LoginAccountRepository
 import com.mogumogu.momogo.user.infra.RefreshTokenRepository
 import com.mogumogu.momogo.user.infra.UserRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -23,6 +26,7 @@ class UserService(
     private val groupRepository: GroupRepository,
     private val photoRepository: PhotoRepository,
     private val photoReactionRepository: PhotoReactionRepository,
+    private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock,
 ) {
 
@@ -66,6 +70,13 @@ class UserService(
                 val group = groupRepository.findActiveByIdForUpdate(groupId) ?: return@forEach
                 if (groupMemberRepository.countJoinedByGroupId(groupId) == 1L) {
                     group.delete(deletedAt)
+                    eventPublisher.publishEvent(
+                        ServiceEvent(
+                            type = ServiceEventType.GROUP_DELETED,
+                            userId = userId,
+                            groupId = groupId,
+                        ),
+                    )
                 }
             }
 
@@ -80,6 +91,13 @@ class UserService(
         photoRepository.clearUploaderByUserId(userId)
         userRepository.delete(user)
         userRepository.flush()
+
+        eventPublisher.publishEvent(
+            ServiceEvent(
+                type = ServiceEventType.USER_WITHDRAWN,
+                userId = userId,
+            ),
+        )
     }
 
     private fun findUser(userId: Long): User =

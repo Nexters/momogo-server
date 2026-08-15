@@ -36,6 +36,14 @@ R2 업로드가 끝나면 `POST /api/v1/photos`에 `objectKey`와 `groupIds`를 
 
 `PHOTO_REPORT_DISCORD_WEBHOOK_URL`에는 환경별 incoming webhook URL을 지정한다. dev와 prod에서는 필수이며, 신고 사유가 사용자나 역할을 멘션하지 않도록 `allowed_mentions`를 비워 전송한다.
 
+## 서비스 이벤트 Discord 알림
+
+회원 가입, 회원 탈퇴, 그룹 생성, 그룹 참여, 그룹 소멸을 Discord로 알린다. 그룹 소멸은 마지막 멤버가 나가 그룹이 삭제될 때만 알리며, 일반적인 그룹 탈퇴는 알리지 않는다.
+
+`SERVICE_EVENT_DISCORD_WEBHOOK_URL`에는 사진 신고와 분리된 webhook URL을 지정한다. dev와 prod에서는 필수다.
+
+알림은 트랜잭션 커밋 이후 별도 스레드에서 전송하므로 롤백된 요청은 알리지 않고, 전송이 실패해도 API 응답에 영향을 주지 않고 경고 로그만 남긴다. 알림 본문에는 사용자 ID와 그룹 ID만 담고 닉네임이나 그룹명 같은 사용자 입력은 보내지 않는다. test 프로필에서는 알림을 비활성화한다.
+
 ## Docker Compose 배포
 
 dev와 prod는 각각 `deploy/compose.dev.yml`, `deploy/compose.prod.yml`을 사용한다. 애플리케이션 포트는 호스트의 loopback 주소에만 공개하고 외부 요청은 같은 서버의 리버스 프록시를 통해 전달한다.

@@ -1,5 +1,7 @@
 package com.mogumogu.momogo.group.application
 
+import com.mogumogu.momogo.event.domain.ServiceEvent
+import com.mogumogu.momogo.event.domain.ServiceEventType
 import com.mogumogu.momogo.global.error.ApiException
 import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.global.time.DailyTimeRangeFactory
@@ -15,6 +17,7 @@ import com.mogumogu.momogo.reaction.domain.Emoji
 import com.mogumogu.momogo.reaction.domain.ReactionConcept
 import com.mogumogu.momogo.reaction.infra.PhotoReactionRepository
 import com.mogumogu.momogo.user.infra.UserRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -31,6 +34,7 @@ class GroupService(
     private val inviteCodeGenerator: InviteCodeGenerator,
     private val photoDownloadUrlGenerator: PhotoDownloadUrlGenerator,
     private val dailyTimeRangeFactory: DailyTimeRangeFactory,
+    private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock,
 ) {
 
@@ -188,6 +192,13 @@ class GroupService(
                 _user = user,
             ),
         )
+        eventPublisher.publishEvent(
+            ServiceEvent(
+                type = ServiceEventType.GROUP_CREATED,
+                userId = command.userId,
+                groupId = group.id!!,
+            ),
+        )
 
         return CreateGroupResult(
             groupId = group.id!!,
@@ -271,6 +282,13 @@ class GroupService(
                 _user = user,
             ),
         )
+        eventPublisher.publishEvent(
+            ServiceEvent(
+                type = ServiceEventType.GROUP_JOINED,
+                userId = command.userId,
+                groupId = groupId,
+            ),
+        )
 
         return JoinGroupResult(
             groupId = groupId,
@@ -292,6 +310,13 @@ class GroupService(
         membership.leave(leftAt)
         if (joinedMemberCount == 1L) {
             group.delete(leftAt)
+            eventPublisher.publishEvent(
+                ServiceEvent(
+                    type = ServiceEventType.GROUP_DELETED,
+                    userId = command.userId,
+                    groupId = command.groupId,
+                ),
+            )
         }
     }
 

@@ -29,6 +29,9 @@ logging:
     org.hibernate.orm.jdbc.bind: TRACE
 
 momogo:
+  event:
+    discord:
+      webhook-url: ${SERVICE_EVENT_DISCORD_WEBHOOK_URL:https://discord.com/api/webhooks/0/not-configured}
   report:
     discord:
       webhook-url: ${PHOTO_REPORT_DISCORD_WEBHOOK_URL:https://discord.com/api/webhooks/0/not-configured}

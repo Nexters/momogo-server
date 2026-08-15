@@ -1,11 +1,11 @@
-package com.mogumogu.momogo.report.infra
+package com.mogumogu.momogo.event.infra
 
 import com.mogumogu.momogo.global.discord.requireDiscordWebhookUrl
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.net.URI
 
-@ConfigurationProperties(prefix = "momogo.report.discord")
-data class DiscordPhotoReportProperties(
+@ConfigurationProperties(prefix = "momogo.event.discord")
+data class DiscordServiceEventProperties(
     val webhookUrl: URI,
 ) {
     init {
