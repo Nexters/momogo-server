@@ -147,9 +147,21 @@ enum class OpenApiExample(
                     "groupId" to 10,
                     "groupName" to "우리 가족",
                     "createdAt" to "2026-08-01T09:00:00.123456",
-                    "totalMemberCount" to 4,
+                    "totalMemberCount" to 2,
                     "todayPhotoUploaderCount" to 2,
                     "latestUploadAt" to "2026-08-10T14:30:00.123456",
+                    "members" to listOf(
+                        mapOf(
+                            "userId" to 1,
+                            "nickname" to "모모",
+                            "mine" to true,
+                        ),
+                        mapOf(
+                            "userId" to 2,
+                            "nickname" to "모고",
+                            "mine" to false,
+                        ),
+                    ),
                 ),
             ),
         ),

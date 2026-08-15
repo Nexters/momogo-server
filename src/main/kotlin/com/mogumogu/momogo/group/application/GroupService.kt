@@ -52,8 +52,10 @@ class GroupService(
         val groupIds = memberships.map { membership ->
             checkNotNull(membership.group.id) { "저장된 그룹 ID가 없습니다." }
         }
-        val memberCountByGroupId = groupMemberRepository.countJoinedByGroupIds(groupIds)
-            .associate { count -> count.groupId to count.totalMemberCount }
+        val membersByGroupId = groupMemberRepository.findJoinedMemberViewsByGroupIds(
+            groupIds = groupIds,
+            requestUserId = userId,
+        ).groupBy { member -> member.groupId }
         val photoUploaderCountByGroupId = photoGroupRepository
             .countPhotoUploadersByGroupIdsAndCreatedAtRange(
                 groupIds = groupIds,
@@ -73,15 +75,22 @@ class GroupService(
             groups = memberships.mapNotNull { membership ->
                 val group = membership.group
                 val groupId = checkNotNull(group.id) { "저장된 그룹 ID가 없습니다." }
-                val totalMemberCount = memberCountByGroupId[groupId]
+                val members = membersByGroupId[groupId]
                     ?: return@mapNotNull null
                 JoinedGroupResult(
                     groupId = groupId,
                     groupName = group.name,
                     createdAt = LocalDateTime.ofInstant(group.createdAt, clock.zone),
-                    totalMemberCount = totalMemberCount,
+                    totalMemberCount = members.size.toLong(),
                     todayPhotoUploaderCount = photoUploaderCountByGroupId[groupId] ?: 0L,
                     latestUploadAt = latestUploadAtByGroupId[groupId],
+                    members = members.map { member ->
+                        JoinedGroupMemberResult(
+                            userId = member.userId,
+                            nickname = member.nickname,
+                            mine = member.userId == userId,
+                        )
+                    },
                 )
             },
         )
@@ -103,8 +112,8 @@ class GroupService(
         } catch (_: java.time.DateTimeException) {
             throw ApiException.BadRequest(ErrorCode.INVALID_REQUEST)
         }
-        val members = groupMemberRepository.findJoinedMemberViewsByGroupId(
-            groupId = groupId,
+        val members = groupMemberRepository.findJoinedMemberViewsByGroupIds(
+            groupIds = listOf(groupId),
             requestUserId = userId,
         )
         val photoViews = photoGroupRepository.findActiveMemberPhotosByGroupIdAndCreatedAtRange(
@@ -338,6 +347,13 @@ data class JoinedGroupResult(
     val totalMemberCount: Long,
     val todayPhotoUploaderCount: Long,
     val latestUploadAt: LocalDateTime?,
+    val members: List<JoinedGroupMemberResult>,
+)
+
+data class JoinedGroupMemberResult(
+    val userId: Long,
+    val nickname: String,
+    val mine: Boolean,
 )
 
 data class GetGroupResult(
