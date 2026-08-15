@@ -856,4 +856,10 @@ private data class PhotoGroupFixture(
     val inviteCode: String,
 )
 
-private val PHOTO_API_TEST_INSTANT = Instant.parse("2026-08-11T03:00:00Z")
+// 고정 시각을 절대 날짜로 박으면 액세스 토큰이 발급 시점부터 이미 만료된 상태가 되어
+// (JWT 검증은 이 Clock이 아닌 실제 시스템 시각을 사용) 며칠 뒤 CI가 통째로 깨진다.
+// 오늘 정오(KST)로 고정해 날짜 경계와 무관하면서도 실제 시각과 어긋나지 않게 한다.
+private val PHOTO_API_TEST_INSTANT: Instant =
+    ZoneId.of(APPLICATION_TIME_ZONE_ID).let { zoneId ->
+        LocalDate.now(zoneId).atTime(12, 0).atZone(zoneId).toInstant()
+    }
