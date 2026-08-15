@@ -149,6 +149,7 @@ enum class OpenApiExample(
                     "createdAt" to "2026-08-01T09:00:00.123456",
                     "totalMemberCount" to 2,
                     "todayPhotoUploaderCount" to 2,
+                    "todayPhotoUploaded" to true,
                     "latestUploadAt" to "2026-08-10T14:30:00.123456",
                     "members" to listOf(
                         mapOf(

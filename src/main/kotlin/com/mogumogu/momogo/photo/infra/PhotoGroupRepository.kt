@@ -61,9 +61,10 @@ interface PhotoGroupRepository : JpaRepository<PhotoGroup, Long> {
 
     @Query(
         """
-        SELECT new com.mogumogu.momogo.photo.infra.TodayPhotoUploaderCount(
+        SELECT new com.mogumogu.momogo.photo.infra.GroupPhotoActivity(
             pg._group._id,
-            COUNT(DISTINCT uploader._id)
+            COUNT(DISTINCT uploader._id),
+            COUNT(CASE WHEN uploader._id = :userId THEN 1 END)
         )
         FROM PhotoGroup pg
         JOIN pg._photo photo
@@ -82,14 +83,16 @@ interface PhotoGroupRepository : JpaRepository<PhotoGroup, Long> {
         GROUP BY pg._group._id
         """,
     )
-    fun countPhotoUploadersByGroupIdsAndCreatedAtRange(
+    fun findPhotoActivitiesByGroupIdsAndCreatedAtRange(
         @Param("groupIds")
         groupIds: List<Long>,
+        @Param("userId")
+        userId: Long,
         @Param("startAt")
         startAt: Instant,
         @Param("endAt")
         endAt: Instant,
-    ): List<TodayPhotoUploaderCount>
+    ): List<GroupPhotoActivity>
 
     @Query(
         """
@@ -145,9 +148,10 @@ interface PhotoGroupRepository : JpaRepository<PhotoGroup, Long> {
     ): Boolean
 }
 
-data class TodayPhotoUploaderCount(
+data class GroupPhotoActivity(
     val groupId: Long,
     val uploaderCount: Long,
+    val requesterUploadCount: Long,
 )
 
 data class LatestGroupUpload(

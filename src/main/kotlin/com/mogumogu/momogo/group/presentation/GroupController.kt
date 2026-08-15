@@ -50,7 +50,7 @@ class GroupController(
 
     @Operation(
         summary = "내가 참여한 그룹 조회",
-        description = "현재 사용자가 참여 중인 그룹, 오늘 사진을 올린 그룹 멤버 수와 " +
+        description = "현재 사용자가 참여 중인 그룹, 오늘 사진을 올린 그룹 멤버 수, 현재 사용자의 오늘 사진 등록 여부와 " +
             "다른 사용자가 올린 활성 사진의 최신 등록 시각을 조회합니다.",
     )
     @ApiExamples(success = OpenApiExample.JOINED_GROUPS_RESPONSE)
@@ -71,6 +71,7 @@ class GroupController(
                     createdAt = group.createdAt,
                     totalMemberCount = group.totalMemberCount,
                     todayPhotoUploaderCount = group.todayPhotoUploaderCount,
+                    todayPhotoUploaded = group.todayPhotoUploaded,
                     latestUploadAt = group.latestUploadAt,
                     members = group.members.map { member ->
                         JoinedGroupMemberResponse(
@@ -393,6 +394,13 @@ data class JoinedGroupResponse(
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val todayPhotoUploaderCount: Long,
+
+    @field:Schema(
+        description = "현재 사용자가 오늘 이 그룹에 활성 사진을 올렸는지 여부",
+        example = "true",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val todayPhotoUploaded: Boolean,
 
     @field:Schema(
         description = "다른 사용자가 그룹에 올린 활성 사진의 최신 등록 시각(Asia/Seoul). " +

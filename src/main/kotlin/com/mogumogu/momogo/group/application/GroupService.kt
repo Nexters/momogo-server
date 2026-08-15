@@ -56,12 +56,13 @@ class GroupService(
             groupIds = groupIds,
             requestUserId = userId,
         ).groupBy { member -> member.groupId }
-        val photoUploaderCountByGroupId = photoGroupRepository
-            .countPhotoUploadersByGroupIdsAndCreatedAtRange(
+        val photoActivityByGroupId = photoGroupRepository
+            .findPhotoActivitiesByGroupIdsAndCreatedAtRange(
                 groupIds = groupIds,
+                userId = userId,
                 startAt = timeRange.startAt,
                 endAt = timeRange.endAt,
-            ).associate { count -> count.groupId to count.uploaderCount }
+            ).associateBy { activity -> activity.groupId }
         val latestUploadAtByGroupId = photoGroupRepository
             .findLatestUploadsByGroupIdsExcludingUserId(
                 groupIds = groupIds,
@@ -77,12 +78,14 @@ class GroupService(
                 val groupId = checkNotNull(group.id) { "저장된 그룹 ID가 없습니다." }
                 val members = membersByGroupId[groupId]
                     ?: return@mapNotNull null
+                val photoActivity = photoActivityByGroupId[groupId]
                 JoinedGroupResult(
                     groupId = groupId,
                     groupName = group.name,
                     createdAt = LocalDateTime.ofInstant(group.createdAt, clock.zone),
                     totalMemberCount = members.size.toLong(),
-                    todayPhotoUploaderCount = photoUploaderCountByGroupId[groupId] ?: 0L,
+                    todayPhotoUploaderCount = photoActivity?.uploaderCount ?: 0L,
+                    todayPhotoUploaded = (photoActivity?.requesterUploadCount ?: 0L) > 0L,
                     latestUploadAt = latestUploadAtByGroupId[groupId],
                     members = members.map { member ->
                         JoinedGroupMemberResult(
@@ -347,6 +350,7 @@ data class JoinedGroupResult(
     val createdAt: LocalDateTime,
     val totalMemberCount: Long,
     val todayPhotoUploaderCount: Long,
+    val todayPhotoUploaded: Boolean,
     val latestUploadAt: LocalDateTime?,
     val members: List<JoinedGroupMemberResult>,
 )

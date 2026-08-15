@@ -529,6 +529,7 @@ class OpenApiDocumentationTest(
                     "createdAt",
                     "totalMemberCount",
                     "todayPhotoUploaderCount",
+                    "todayPhotoUploaded",
                     "latestUploadAt",
                     "members",
                 )
@@ -538,6 +539,7 @@ class OpenApiDocumentationTest(
                     "createdAt",
                     "totalMemberCount",
                     "todayPhotoUploaderCount",
+                    "todayPhotoUploaded",
                     "latestUploadAt",
                     "members",
                 )

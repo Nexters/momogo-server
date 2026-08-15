@@ -450,6 +450,7 @@ class GroupApiIntegrationTest(
                         "createdAt",
                         "totalMemberCount",
                         "todayPhotoUploaderCount",
+                        "todayPhotoUploaded",
                         "latestUploadAt",
                         "members",
                     )
@@ -458,6 +459,7 @@ class GroupApiIntegrationTest(
                         LocalDateTime.ofInstant(groupWithPhotos.createdAt, clock.zone)
                     group["totalMemberCount"].longValue() shouldBe 5L
                     group["todayPhotoUploaderCount"].longValue() shouldBe 3L
+                    group["todayPhotoUploaded"].booleanValue() shouldBe true
                     LocalDateTime.parse(group["latestUploadAt"].stringValue()) shouldBe
                         LocalDateTime.ofInstant(todayAtNoon, clock.zone)
 
@@ -487,6 +489,7 @@ class GroupApiIntegrationTest(
                     group["groupName"].stringValue() shouldBe "오늘 사진이 없는 그룹"
                     group["totalMemberCount"].longValue() shouldBe 1L
                     group["todayPhotoUploaderCount"].longValue() shouldBe 0L
+                    group["todayPhotoUploaded"].booleanValue() shouldBe false
                     group["latestUploadAt"].isNull shouldBe true
                     group["members"].size() shouldBe 1
                     group["members"][0]["userId"].longValue() shouldBe
