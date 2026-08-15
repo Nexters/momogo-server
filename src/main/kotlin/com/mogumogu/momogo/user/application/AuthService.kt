@@ -1,5 +1,7 @@
 package com.mogumogu.momogo.user.application
 
+import com.mogumogu.momogo.event.domain.ServiceEvent
+import com.mogumogu.momogo.event.domain.ServiceEventType
 import com.mogumogu.momogo.global.error.ApiException
 import com.mogumogu.momogo.global.error.ErrorCode
 import com.mogumogu.momogo.global.token.RefreshTokenProvider
@@ -9,6 +11,7 @@ import com.mogumogu.momogo.user.domain.User
 import com.mogumogu.momogo.user.infra.LoginAccountRepository
 import com.mogumogu.momogo.user.infra.RefreshTokenRepository
 import com.mogumogu.momogo.user.infra.UserRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -22,6 +25,7 @@ class AuthService(
     private val providerTokenAuthenticationService: ProviderTokenAuthenticationService,
     private val refreshTokenProvider: RefreshTokenProvider,
     private val tokenIssuer: TokenIssuer,
+    private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock,
 ) {
 
@@ -49,7 +53,16 @@ class AuthService(
             throw ApiException.Conflict(ErrorCode.DUPLICATE_LOGIN_ACCOUNT)
         }
 
-        return user.toAuthenticatedUser(tokenIssuer.issue(user))
+        val authenticatedUser = user.toAuthenticatedUser(tokenIssuer.issue(user))
+        eventPublisher.publishEvent(
+            ServiceEvent(
+                type = ServiceEventType.USER_REGISTERED,
+                userId = authenticatedUser.userId,
+                totalUserCount = userRepository.count(),
+            ),
+        )
+
+        return authenticatedUser
     }
 
     @Transactional

@@ -29,6 +29,9 @@ springdoc:
 momogo:
   openapi:
     server-url: http://localhost:${server.port}
+  event:
+    discord:
+      webhook-url: ${SERVICE_EVENT_DISCORD_WEBHOOK_URL}
   report:
     discord:
       webhook-url: ${PHOTO_REPORT_DISCORD_WEBHOOK_URL}

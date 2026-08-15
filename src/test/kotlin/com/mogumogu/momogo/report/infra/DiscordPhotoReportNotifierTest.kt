@@ -1,5 +1,6 @@
 package com.mogumogu.momogo.report.infra
 
+import com.mogumogu.momogo.global.discord.discordWebhookClient
 import com.mogumogu.momogo.report.application.PhotoReportNotification
 import com.mogumogu.momogo.report.application.PhotoReportNotificationException
 import io.kotest.assertions.throwables.shouldThrow
@@ -40,7 +41,7 @@ class DiscordPhotoReportNotifierTest : BehaviorSpec({
         `when`("Discord webhook이 성공할 때") {
             val builder = RestClient.builder().baseUrl(webhookUrl)
             val server = MockRestServiceServer.bindTo(builder).build()
-            val notifier = DiscordPhotoReportNotifier(builder.build(), clock)
+            val notifier = DiscordPhotoReportNotifier(discordWebhookClient(builder), clock)
 
             server
                 .expect(ExpectedCount.once(), requestTo("$webhookUrl?wait=true"))
@@ -54,6 +55,9 @@ class DiscordPhotoReportNotifierTest : BehaviorSpec({
                     body["allowed_mentions"]["parse"].size() shouldBe 0
 
                     val embed = body["embeds"][0]
+                    // author를 쓰지 않는 알림이므로 null 필드가 직렬화되지 않아야 한다.
+                    embed.propertyNames().asSequence().toSet() shouldBe
+                        setOf("title", "color", "fields", "timestamp")
                     embed["title"].stringValue() shouldBe "[DEV] 사진 신고 접수"
                     embed["color"].intValue() shouldBe 15_158_332
                     embed["timestamp"].stringValue() shouldBe reportedAt.toString()
@@ -83,7 +87,7 @@ class DiscordPhotoReportNotifierTest : BehaviorSpec({
             `when`("신고 알림을 전송할 때") {
                 val builder = RestClient.builder().baseUrl(webhookUrl)
                 val server = MockRestServiceServer.bindTo(builder).build()
-                val notifier = DiscordPhotoReportNotifier(builder.build(), clock)
+                val notifier = DiscordPhotoReportNotifier(discordWebhookClient(builder), clock)
                 server
                     .expect(ExpectedCount.once(), requestTo("$webhookUrl?wait=true"))
                     .andRespond(
