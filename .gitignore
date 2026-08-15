@@ -54,3 +54,6 @@ application-secret.yml
 
 ### oh-my-claudecode ###
 .omc/
+
+### Claude Code ###
+.mcp.json
