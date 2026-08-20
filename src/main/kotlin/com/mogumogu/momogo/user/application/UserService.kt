@@ -12,6 +12,7 @@ import com.mogumogu.momogo.user.domain.User
 import com.mogumogu.momogo.user.infra.LoginAccountRepository
 import com.mogumogu.momogo.user.infra.RefreshTokenRepository
 import com.mogumogu.momogo.user.infra.UserRepository
+import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -29,6 +30,8 @@ class UserService(
     private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock,
 ) {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     @Transactional(readOnly = true)
     fun getUser(userId: Long): GetUserResult {
@@ -91,6 +94,9 @@ class UserService(
         photoRepository.clearUploaderByUserId(userId)
         userRepository.delete(user)
         userRepository.flush()
+
+        // 탈퇴는 이후 로그인이 계정 없음으로 실패하는 원인이 되므로 남긴다.
+        log.info("회원 탈퇴 완료: userId={}", userId)
 
         eventPublisher.publishEvent(
             ServiceEvent(

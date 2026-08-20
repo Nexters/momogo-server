@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.context.request.ServletWebRequest
 import org.springframework.web.context.request.WebRequest
 import org.springframework.web.method.annotation.HandlerMethodValidationException
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
@@ -123,6 +124,23 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         )
     }
 
+    /**
+     * 이 advice가 처리하는 모든 예외가 지나가는 지점이므로 여기서 응답 실패를 로그로 남긴다.
+     * [ApiException]은 [org.springframework.web.ErrorResponseException]으로 처리되어
+     * [handleUnexpectedException]까지 오지 않기 때문에 4xx 응답이 로그에 남지 않는 문제를 막는다.
+     */
+    override fun handleExceptionInternal(
+        ex: Exception,
+        body: Any?,
+        headers: HttpHeaders,
+        statusCode: HttpStatusCode,
+        request: WebRequest,
+    ): ResponseEntity<Any>? {
+        logHandledException(ex, body, statusCode, request)
+
+        return super.handleExceptionInternal(ex, body, headers, statusCode, request)
+    }
+
     private fun createProblemDetail(
         status: HttpStatus,
         errorCode: ErrorCode,
@@ -142,5 +160,42 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
             request.requestURI,
             exception.javaClass.name,
         )
+    }
+
+    private fun logHandledException(
+        exception: Exception,
+        body: Any?,
+        statusCode: HttpStatusCode,
+        request: WebRequest,
+    ) {
+        val servletRequest = (request as? ServletWebRequest)?.request
+        val arguments = arrayOf<Any?>(
+            servletRequest?.method,
+            servletRequest?.requestURI,
+            statusCode.value(),
+            resolveErrorCode(exception, body),
+            exception.javaClass.name,
+        )
+
+        if (statusCode.is5xxServerError) {
+            log.error(HANDLED_EXCEPTION_MESSAGE, *arguments)
+        } else {
+            log.warn(HANDLED_EXCEPTION_MESSAGE, *arguments)
+        }
+    }
+
+    private fun resolveErrorCode(
+        exception: Exception,
+        body: Any?,
+    ): String? =
+        when {
+            exception is ApiException -> exception.errorCode.name
+            body is ProblemDetail -> body.properties?.get("code")?.toString()
+            else -> null
+        }
+
+    private companion object {
+        const val HANDLED_EXCEPTION_MESSAGE =
+            "API 오류 응답: method={}, path={}, status={}, code={}, exceptionType={}"
     }
 }

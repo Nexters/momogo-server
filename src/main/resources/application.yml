@@ -9,6 +9,11 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
+logging:
+  pattern:
+    # 한 요청의 로그를 이어보고 사용자별로 동선을 추적할 수 있도록 MDC 값을 모든 로그 줄에 노출한다.
+    level: "%5p [req=%X{requestId:--} user=%X{userId:--}]"
+
 management:
   endpoints:
     web:
