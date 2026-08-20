@@ -1,7 +1,11 @@
 package com.mogumogu.momogo.global.error
 
+import ch.qos.logback.classic.Level
+import com.mogumogu.momogo.global.logging.captureLogs
+import com.mogumogu.momogo.global.logging.messagesAt
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Positive
@@ -222,6 +226,39 @@ class GlobalExceptionHandlerTest : BehaviorSpec({
                 body["detail"].stringValue() shouldBe "서버 내부 오류가 발생했습니다."
                 body["instance"].stringValue() shouldBe "/test/illegal-argument"
                 body["code"].stringValue() shouldBe ErrorCode.INTERNAL_SERVER_ERROR.name
+            }
+        }
+    }
+    given("오류 응답을 내려주면") {
+        `when`("ApiException으로 4xx를 응답할 때") {
+            val logs = captureLogs(GlobalExceptionHandler::class.java, Level.WARN) {
+                mockMvc.perform(get("/test/api-exception"))
+            }
+
+            then("WARN으로 메서드와 경로, 상태, ErrorCode를 남긴다") {
+                val message = logs.messagesAt(Level.WARN).single()
+
+                message shouldContain "method=GET"
+                message shouldContain "path=/test/api-exception"
+                message shouldContain "status=404"
+                message shouldContain "code=${ErrorCode.RESOURCE_NOT_FOUND.name}"
+            }
+        }
+
+        `when`("요청 검증 실패로 4xx를 응답할 때") {
+            val logs = captureLogs(GlobalExceptionHandler::class.java, Level.WARN) {
+                mockMvc.perform(
+                    post("/test/validation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"name":""}"""),
+                )
+            }
+
+            then("WARN으로 INVALID_REQUEST를 남긴다") {
+                val message = logs.messagesAt(Level.WARN).single()
+
+                message shouldContain "status=400"
+                message shouldContain "code=${ErrorCode.INVALID_REQUEST.name}"
             }
         }
     }
